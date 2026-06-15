@@ -4,10 +4,12 @@ set -e
 # Admissions Officer — Deployment Script
 # Handles: prerequisites, dependencies, environment, and service startup
 
-VERSION="1.1.2"
+VERSION="1.1.4"
 SERVICE_NAME="admissions-officer"
+PACKAGE_NAME="ao"
 NODE_MIN_VERSION="18.0.0"
 PORT=${PORT:-3000}
+PUBLISH_TO_NPM=false
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Colors for output
@@ -162,6 +164,26 @@ health_check() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# NPM Publish
+# ═══════════════════════════════════════════════════════════════════════════════
+
+publish_to_npm() {
+  log_info "Publishing $PACKAGE_NAME to npm..."
+
+  # Check if npm is authenticated
+  if ! npm whoami &> /dev/null; then
+    die "npm is not authenticated. Run 'npm login' first"
+  fi
+
+  # Publish to npm
+  if npm publish; then
+    log_success "Published $PACKAGE_NAME@$VERSION to npm"
+  else
+    die "Failed to publish to npm"
+  fi
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # Service Management
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -213,12 +235,18 @@ main() {
         PORT="$2"
         shift 2
         ;;
+      --publish)
+        PUBLISH_TO_NPM=true
+        log_info "Will publish to npm after deployment"
+        shift
+        ;;
       --help)
         echo "Usage: ./deploy.sh [OPTIONS]"
         echo ""
         echo "Options:"
         echo "  --dry-run         Show what would be done without making changes"
         echo "  --port PORT       Specify port (default: 3000)"
+        echo "  --publish         Publish package to npm"
         echo "  --help            Show this help message"
         exit 0
         ;;
@@ -238,6 +266,11 @@ main() {
 
   if [ "$dry_run" = false ]; then
     install_dependencies
+
+    if [ "$PUBLISH_TO_NPM" = true ]; then
+      publish_to_npm
+    fi
+
     start_service
 
     echo ""
@@ -247,6 +280,9 @@ main() {
     echo "║ Service: $SERVICE_NAME                                                 ║"
     echo "║ Port:    $PORT                                                          ║"
     echo "║ Version: $VERSION                                                       ║"
+    if [ "$PUBLISH_TO_NPM" = true ]; then
+      echo "║ Published to npm: $PACKAGE_NAME@$VERSION                              ║"
+    fi
     echo "║ URL:     http://localhost:${PORT}                                        ║"
     echo "╚════════════════════════════════════════════════════════════════════════╝"
     echo ""
@@ -256,8 +292,14 @@ main() {
     echo ""
     echo "Dry-run complete. The following steps would be executed:"
     echo "  1. Install npm dependencies"
-    echo "  2. Start Node.js service on port $PORT"
-    echo "  3. Verify server health"
+    if [ "$PUBLISH_TO_NPM" = true ]; then
+      echo "  2. Publish $PACKAGE_NAME@$VERSION to npm"
+      echo "  3. Start Node.js service on port $PORT"
+      echo "  4. Verify server health"
+    else
+      echo "  2. Start Node.js service on port $PORT"
+      echo "  3. Verify server health"
+    fi
   fi
 }
 

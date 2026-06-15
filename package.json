@@ -1,6 +1,6 @@
 {
-  "name": "admissions-officer",
-  "version": "1.1.2",
+  "name": "ao",
+  "version": "1.1.4",
   "description": "AI-assisted college application profile builder for high school seniors",
   "main": "src/server/index.js",
   "bin": {
