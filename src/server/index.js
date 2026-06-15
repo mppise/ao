@@ -58,6 +58,10 @@ app.use('/api/essays', essaysRouter);
 const configLimitsRouter = require('./routes/config-limits');
 app.use('/api/config/limits', configLimitsRouter);
 
+// /api/config/init — GET checks if GEMINI_API_KEY+MODEL are set; POST saves them to .env
+const configInitRouter = require('./routes/config-init');
+app.use('/api/config/init', configInitRouter);
+
 // SPA fallback: serve index.html for all non-API GET routes
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api/')) {

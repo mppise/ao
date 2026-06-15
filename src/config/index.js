@@ -1,3 +1,4 @@
+// @story STORY-001 | non-blocking .env initialization
 'use strict';
 
 const path = require('path');
@@ -31,6 +32,54 @@ function validateConfig() {
   }
 }
 
+/**
+ * Write one or more key=value pairs to the .env file at project root.
+ * Preserves comments and all existing lines; appends new keys.
+ * Also updates process.env immediately so the running server picks up changes.
+ * @param {object} updates - e.g. { GEMINI_API_KEY: '...', GEMINI_MODEL: '...' }
+ */
+function writeEnvConfig(updates) {
+  let content = '';
+  if (fs.existsSync(envPath)) {
+    content = fs.readFileSync(envPath, 'utf8');
+  }
+
+  const lines = content.split('\n');
+  const updatedKeys = new Set();
+
+  const newLines = lines.map((line) => {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) return line;
+    const eqIdx = trimmed.indexOf('=');
+    if (eqIdx === -1) return line;
+    const key = trimmed.slice(0, eqIdx).trim();
+    if (key in updates) {
+      updatedKeys.add(key);
+      return `${key}=${updates[key]}`;
+    }
+    return line;
+  });
+
+  for (const [key, val] of Object.entries(updates)) {
+    if (!updatedKeys.has(key)) {
+      newLines.push(`${key}=${val}`);
+    }
+  }
+
+  const newContent = newLines.join('\n');
+  const tmpPath = envPath + '.tmp.' + Date.now();
+  fs.writeFileSync(tmpPath, newContent, 'utf8');
+  fs.renameSync(tmpPath, envPath);
+
+  // Reflect changes in current process immediately
+  for (const [key, val] of Object.entries(updates)) {
+    process.env[key] = val;
+  }
+  // Refresh exported config fields
+  config.geminiApiKey = process.env.GEMINI_API_KEY || null;
+  config.geminiModel = process.env.GEMINI_MODEL || null;
+}
+
 const config = {
   geminiApiKey: process.env.GEMINI_API_KEY || null,
   geminiModel: process.env.GEMINI_MODEL || null,
@@ -38,6 +87,7 @@ const config = {
   dataDir: process.env.DATA_DIR || null,
   envPath,
   validate: validateConfig,
+  writeEnvConfig,
 };
 
 module.exports = config;

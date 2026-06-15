@@ -1,4 +1,5 @@
 /* app.js — Main application logic, screen routing, form handling */
+// @story STORY-001 | non-blocking .env initialization
 
 'use strict';
 
@@ -54,7 +55,93 @@ async function fetchLimits() {
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
+// ─── Setup modal helpers (STORY-001) ─────────────────────────────────────────
+
+/**
+ * Show the first-run setup modal and return a Promise that resolves
+ * once the user successfully saves their API key + model.
+ * The modal is static (cannot be dismissed without saving).
+ */
+function waitForSetupComplete() {
+  return new Promise((resolve) => {
+    const modalEl = document.getElementById('setup-modal');
+    const saveBtn = document.getElementById('setup-save-btn');
+    const errorEl = document.getElementById('setup-modal-error');
+    const spinner = document.getElementById('setup-save-spinner');
+    const keyInput = document.getElementById('setup-api-key');
+    const modelInput = document.getElementById('setup-model');
+
+    if (!modalEl) {
+      // HTML element missing — skip gracefully
+      resolve();
+      return;
+    }
+
+    const bsModal = new bootstrap.Modal(modalEl, { backdrop: 'static', keyboard: false });
+    bsModal.show();
+
+    // @entry POST /api/config/init | setup modal save handler
+    saveBtn.addEventListener('click', async () => {
+      const geminiApiKey = (keyInput.value || '').trim();
+      const geminiModel = (modelInput.value || '').trim();
+
+      // Client-side validation
+      errorEl.classList.add('d-none');
+      errorEl.textContent = '';
+      if (!geminiApiKey) {
+        errorEl.textContent = 'Please enter your Gemini API key.';
+        errorEl.classList.remove('d-none');
+        keyInput.focus();
+        return;
+      }
+      if (!geminiModel) {
+        errorEl.textContent = 'Please enter the Gemini model name.';
+        errorEl.classList.remove('d-none');
+        modelInput.focus();
+        return;
+      }
+
+      saveBtn.disabled = true;
+      spinner.classList.remove('d-none');
+
+      const result = await saveConfigInit({ geminiApiKey, geminiModel });
+
+      spinner.classList.add('d-none');
+      saveBtn.disabled = false;
+
+      if (result && result.success) {
+        bsModal.hide();
+        // Wait for modal hide animation before continuing boot
+        modalEl.addEventListener('hidden.bs.modal', () => resolve(), { once: true });
+      } else {
+        const msg =
+          (result && result.error && result.error.message) ||
+          'Could not save settings. Check that the app directory is writable.';
+        errorEl.textContent = msg;
+        errorEl.classList.remove('d-none');
+      }
+    });
+
+    // Allow Enter key in inputs to trigger save
+    [keyInput, modelInput].forEach((input) => {
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') saveBtn.click();
+      });
+    });
+  });
+}
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+
 document.addEventListener('DOMContentLoaded', async () => {
+  // ── STORY-001: Check if Gemini credentials are configured before routing ──
+  // Runs before the normal router so the setup modal blocks the UI on first run.
+  const initResult = await getConfigInit();
+  if (initResult && initResult.success && initResult.data && !initResult.data.configured) {
+    await waitForSetupComplete();
+  }
+  // ── End STORY-001 setup check ──
+
   // Register popstate handler for browser back/forward
   window.addEventListener('popstate', () => {
     router(window.location.pathname);

@@ -592,6 +592,29 @@ async function deleteEssay(id) {
   });
 }
 
+// ─── Config Init API (STORY-001) ─────────────────────────────────────────────
+
+/**
+ * GET /api/config/init
+ * Returns { configured: boolean, geminiModel: string|null }.
+ * Used on load to decide whether to show the setup modal.
+ */
+async function getConfigInit() {
+  return apiFetch('/api/config/init');
+}
+
+/**
+ * POST /api/config/init
+ * Save GEMINI_API_KEY and GEMINI_MODEL to .env.
+ * @param {{ geminiApiKey: string, geminiModel: string }} payload
+ */
+async function saveConfigInit(payload) {
+  return apiFetch('/api/config/init', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
 // ─── Config Limits API (STORY-007) ───────────────────────────────────────────
 
 /**

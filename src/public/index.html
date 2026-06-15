@@ -67,6 +67,84 @@
     </div>
   </div>
 
+  <!-- Setup modal: shown on first run when GEMINI_API_KEY / GEMINI_MODEL are missing -->
+  <div
+    class="modal fade"
+    id="setup-modal"
+    tabindex="-1"
+    aria-labelledby="setup-modal-label"
+    aria-modal="true"
+    role="dialog"
+    data-bs-backdrop="static"
+    data-bs-keyboard="false"
+  >
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header border-0 pb-0">
+          <h5 class="modal-title fw-semibold" id="setup-modal-label">
+            <i class="bi bi-key me-2 text-primary"></i>Set Up Admissions Officer
+          </h5>
+        </div>
+        <div class="modal-body pt-2">
+          <p class="text-muted small mb-3">
+            AO uses Google Gemini to read and understand your documents.
+            Enter your API key below — it is saved only on your machine.
+          </p>
+          <div id="setup-modal-error" class="alert alert-danger d-none py-2 small" role="alert"></div>
+          <div class="mb-3">
+            <label for="setup-api-key" class="form-label fw-medium">
+              Gemini API Key <span class="text-danger">*</span>
+            </label>
+            <input
+              type="password"
+              class="form-control font-monospace"
+              id="setup-api-key"
+              placeholder="AIzaSy..."
+              autocomplete="off"
+              spellcheck="false"
+              aria-describedby="setup-api-key-help"
+            />
+            <div id="setup-api-key-help" class="form-text">
+              Get a free key at
+              <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">
+                aistudio.google.com
+              </a>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label for="setup-model" class="form-label fw-medium">
+              Gemini Model <span class="text-danger">*</span>
+            </label>
+            <input
+              type="text"
+              class="form-control font-monospace"
+              id="setup-model"
+              value="gemini-2.5-flash-lite"
+              placeholder="gemini-2.5-flash-lite"
+              autocomplete="off"
+              spellcheck="false"
+              aria-describedby="setup-model-help"
+            />
+            <div id="setup-model-help" class="form-text">
+              Recommended: <code>gemini-2.5-flash-lite</code>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer border-0 pt-0">
+          <button
+            type="button"
+            id="setup-save-btn"
+            class="btn btn-primary w-100"
+            aria-label="Save settings and start the app"
+          >
+            <span id="setup-save-spinner" class="spinner-border spinner-border-sm me-2 d-none" role="status" aria-hidden="true"></span>
+            Save Settings
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Bootstrap 5 JS (for modals, tooltips) -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="/js/api-client.js"></script>

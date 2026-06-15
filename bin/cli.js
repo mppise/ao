@@ -3,16 +3,9 @@
 
 const path = require('path');
 
-// Load config (reads .env from project root)
-let config;
-try {
-  config = require('../src/config/index');
-  config.validate();
-} catch (err) {
-  console.error('\n[AO] Startup failed:\n' + err.message);
-  console.error('\nPlease copy .env.example to .env and fill in GEMINI_API_KEY and GEMINI_MODEL.\n');
-  process.exit(1);
-}
+// @story STORY-001 | non-blocking .env initialization
+// Load config (reads .env from project root — validation is deferred to UI setup modal)
+const config = require('../src/config/index');
 
 const app = require('../src/server/index');
 

@@ -9,28 +9,24 @@ runtime:
   has_migrations: false
   exposed_ports: [3000]
 files_modified:
-  - src/server/routes/profile.js
+  - bin/cli.js
+  - src/config/index.js
+  - src/server/index.js
+  - src/server/routes/config-init.js
+  - src/public/index.html
   - src/public/js/app.js
   - src/public/js/api-client.js
-  - specs/project-state.yaml
-  - specs/stories/STORY-001/build-report.yaml
-  - (previously) package.json
-  - (previously) bin/cli.js
-  - (previously) src/config/index.js
-  - (previously) src/server/index.js
+  - .env.example
+  - (previously) src/server/routes/profile.js
   - (previously) src/server/routes/onboarding.js
   - (previously) src/server/routes/settings.js
   - (previously) src/utils/file-io.js
   - (previously) src/utils/profile-init.js
-  - (previously) src/public/index.html
   - (previously) src/public/css/custom.css
   - (previously) src/public/js/ui-utils.js
-  - (previously) .env.example
 commits: []
-gap_specs:
-  - gap-2026-06-14.md
-  - gap-2026-06-14-2.md
 warnings:
+  - "Enhancement build (gate_bypass:true, 2026-06-15): non-blocking .env init. Removed config.validate()/process.exit(1) from bin/cli.js. Added writeEnvConfig() to src/config/index.js. Added GET+POST /api/config/init endpoints. Added setup modal to index.html. Boot sequence in app.js now checks /api/config/init and shows modal when not configured."
   - "Bug-fix build (gate_bypass:true, 2026-06-15): Removed profile completion progress bar from the dashboard. The 'Your Profile' heading and percentage label were also removed. The .ao-progress CSS class was retained because it is shared with onboarding step indicators and other progress elements."
   - "Bootstrap CSS and Icons loaded from CDN (jsdelivr.net). Offline usage requires local copies — deferred to a future story."
   - "uuid@9 deprecation warning during npm install; functionality unaffected for Node.js CommonJS usage."
@@ -39,4 +35,7 @@ warnings:
   - "Enhancement build (gate_bypass:true): replaced showSectionPlaceholder with showAcademicDetail, showTestsDetail, showAchievementsDetail, showActivitiesDetail. Added GET /api/profile/section/:name backend endpoint. impact_statements and essays placeholders now redirect to their proper routes."
   - "Bug-fix build (gate_bypass:true, v1.1.2): added full CRUD for Activities, Achievements, and AP/IB Exam Scores. AP/IB scores exist in two storage locations (academic.json apIbScores for legacy, tests.json data.ap/data.ib for spec-defined). All new endpoints search both. Documented in gap-2026-06-14.md."
   - "Bug-fix build (gate_bypass:true, 2026-06-15): Fixed broken back navigation on achievements, activities, academic, tests, impact statements, essays, and settings pages. Root causes: (1) showImpactStatementsList used history.back() which navigated to duplicate history entry instead of dashboard; (2) double-pushState: appNavigate() called pushState then each render function called pushState again, creating duplicate history entries requiring 2 browser-back clicks to navigate. Fixed by: changing all router-dispatched render functions (showDashboard, showSettings, showImpactStatementsList, showEssaysList, showAcademicDetail, showTestsDetail, showAchievementsDetail, showActivitiesDetail) from history.pushState to history.replaceState; changing showImpactStatementsList back button from history.back() to appNavigate('/'); changing showImpactGenerator back button from showDashboard() direct call to appNavigate('/')."
+gap_specs:
+  - gap-2026-06-14.md
+  - gap-2026-06-14-2.md
 overall_status: pass
