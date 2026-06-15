@@ -1,0 +1,31 @@
+# SpecGantry — generated for release 1.0.0
+# Exclude from npm publish / npx distribution
+
+# Project specs and internal docs
+specs/
+
+# Test files
+tests/
+*.test.js
+*.spec.js
+
+# Environment secrets
+.env
+.env.*
+!.env.example
+
+# Development artifacts
+*.log
+.DS_Store
+
+# Data directory (user data — never shipped)
+data/
+
+# Git
+.git/
+.gitignore
+
+# CI / editor config
+.github/
+.vscode/
+.idea/

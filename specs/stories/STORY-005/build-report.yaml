@@ -1,0 +1,27 @@
+story_id: STORY-005
+runtime:
+  language: node
+  language_version: "24.13.0"
+  package_manager: npm
+  build_command: "node bin/cli.js"
+  build_output_dir: "src/public"
+  has_dockerfile: false
+  has_migrations: false
+  exposed_ports: [3000]
+files_modified:
+  - src/public/index.html
+  - src/public/js/export.js
+  - src/public/js/app.js
+  - src/public/js/ui-utils.js
+  - src/public/css/custom.css
+  - src/lib/zipExport.js
+  - src/lib/pdfExport.js
+  - src/lib/shareTokens.js
+  - src/server/routes/export.js
+  - src/server/routes/share.js
+  - src/server/middleware/rateLimit.js
+  - src/server/index.js
+commits: []
+warnings:
+  - "Bug fix: buildProfileHTML in share.js had three distinct [object Object] root causes fixed: (1) metadata loaded from profile/.metadata.json instead of DATA_DIR root where it is actually written; (2) metadata.firstName accessed instead of metadata.student.firstName per the schema written by profile-init.js; (3) all profile section fields (gpa, schoolName, courses, sat, act, achievements, activities, impact_statements) were accessed at the wrong nesting level — gpa is a citation object with .overall.value, schoolName is a citation object with .value, courses are objects with .name, sat/act are nested score objects, achievements/activities use .achievements/.activities arrays, and impact_statements wrap their array under .data.statements. Added extractScalar() helper to unwrap citation objects safely."
+overall_status: pass

@@ -1,0 +1,15 @@
+{
+  "version": "1.1.1",
+  "date": "2026-06-14",
+  "release_type": "patch",
+  "target": "npm registry (npx ao)",
+  "deployment_order": ["STORY-005"],
+  "stories": [
+    {
+      "id": "STORY-005",
+      "title": "Profile export (JSON, PDF) and shareable links",
+      "changes": "Critical fix: buildProfileHTML in share.js had three distinct [object Object] root causes. (1) metadata loaded from profile/.metadata.json instead of DATA_DIR root. (2) metadata.student.firstName accessed instead of metadata.firstName per actual schema. (3) All profile section fields accessed at wrong nesting level — gpa, schoolName, courses, sat, act, achievements, activities, impact_statements all corrected. Added extractScalar() helper to unwrap citation objects safely."
+    }
+  ],
+  "notes": "Patch release — critical share page fix. No breaking changes. No database migrations. No new dependencies."
+}

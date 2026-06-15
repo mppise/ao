@@ -1,0 +1,253 @@
+/* Admissions Officer — Custom Bootstrap Overrides */
+
+:root {
+  --ao-primary: #0d6efd;
+  --ao-card-radius: 0.75rem;
+  --ao-transition: 0.2s ease;
+}
+
+body {
+  background-color: #f8f9fa;
+  color: #212529;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+/* Navbar */
+#app-navbar {
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Screen container spacing */
+#app-screen {
+  min-height: calc(100vh - 60px);
+}
+
+/* Onboarding card */
+.ao-onboarding-card {
+  max-width: 480px;
+  border-radius: var(--ao-card-radius);
+  border: 1px solid rgba(0,0,0,0.08);
+}
+
+/* Welcome screen hero */
+.ao-welcome-icon {
+  font-size: 4rem;
+  color: var(--ao-primary);
+}
+
+/* Progress bar */
+.ao-progress {
+  height: 8px;
+  border-radius: 4px;
+  background-color: #e9ecef;
+}
+.ao-progress .progress-bar {
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+
+/* Section tiles (dashboard) */
+.ao-section-card {
+  border-radius: var(--ao-card-radius);
+  border: 1px solid rgba(0,0,0,0.08);
+  transition: box-shadow var(--ao-transition);
+  cursor: default;
+}
+
+.ao-section-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+/* Card-as-link pattern: entire card is clickable */
+.card-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.card-link:hover .ao-section-card,
+.card-link:focus .ao-section-card {
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.1);
+  cursor: pointer;
+}
+
+.card-link:focus {
+  outline: none;
+}
+
+.card-link:focus-visible .ao-section-card {
+  box-shadow: 0 0 0 3px var(--ao-primary);
+}
+
+/* Export card (card-as-link div pattern) */
+.card-export-link {
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, transform 0.1s ease;
+  text-decoration: none;
+  color: inherit;
+}
+
+.card-export-link:hover,
+.card-export-link:focus {
+  box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+  outline: 2px solid var(--bs-primary, var(--ao-primary));
+  outline-offset: 2px;
+}
+
+.card-export-link:active {
+  transform: translateY(0);
+}
+
+.ao-section-icon {
+  font-size: 2rem;
+  color: var(--ao-primary);
+}
+
+.ao-section-status {
+  font-size: 0.85rem;
+  color: #6c757d;
+}
+
+/* Disabled generate button tooltip */
+.ao-generate-disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+/* Form validation */
+.form-control.is-invalid,
+.form-select.is-invalid {
+  border-color: #dc3545;
+}
+
+.invalid-feedback {
+  font-size: 0.8rem;
+}
+
+/* Toast notifications */
+.ao-toast-container {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 1100;
+  min-width: 280px;
+}
+
+/* Alert info banner */
+.ao-hint-banner {
+  border-radius: var(--ao-card-radius);
+}
+
+/* Modal */
+.modal-content {
+  border-radius: var(--ao-card-radius);
+}
+
+/* Responsive adjustments */
+@media (max-width: 576px) {
+  .ao-onboarding-card {
+    margin: 0 0.5rem;
+  }
+  #app-screen {
+    padding-top: 1.5rem !important;
+  }
+}
+
+/* ─── STORY-003a: AI Transparency & Data Provenance ────────────────────────── */
+
+/* Questionnaire Modal — character counters */
+.ao-char-counter {
+  font-size: 0.78rem;
+  color: #6c757d;
+  transition: color 0.15s ease;
+}
+.ao-char-counter.warn { color: #fd7e14; }
+.ao-char-counter.danger { color: #dc3545; }
+
+/* Reasoning Offcanvas — 400px fixed width on desktop */
+#reasoningOffcanvas {
+  width: 400px;
+}
+@media (max-width: 576px) {
+  #reasoningOffcanvas {
+    width: 100%;
+  }
+}
+
+/* Reasoning offcanvas sub-sections */
+.ao-reasoning-section {
+  border-left: 3px solid #dee2e6;
+  padding-left: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+/* Inline reasoning / sources toggle link */
+.ao-reasoning-toggle {
+  font-size: 0.85rem;
+  text-decoration: none;
+  color: #0d6efd;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+}
+.ao-reasoning-toggle:hover { text-decoration: underline; }
+
+/* Inline reasoning collapsible inner panel */
+.ao-reasoning-inner {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+}
+
+/* Essay provenance modal — section card rows */
+.ao-provenance-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid #f0f0f0;
+  flex-wrap: wrap;
+}
+.ao-provenance-row:last-child { border-bottom: none; }
+.ao-provenance-row .ao-prov-label {
+  flex: 1 1 auto;
+  font-size: 0.9rem;
+}
+.ao-provenance-row .ao-prov-badges {
+  display: flex;
+  gap: 0.3rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.ao-provenance-row .ao-prov-toggle {
+  flex: 0 0 auto;
+}
+
+/* Essay sources toggle panel */
+.ao-sources-inner {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+}
+.ao-sources-section-heading {
+  font-weight: 600;
+  color: #6c757d;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.25rem;
+  margin-top: 0.5rem;
+}
+.ao-sources-section-heading:first-child { margin-top: 0; }

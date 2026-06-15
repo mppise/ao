@@ -1,0 +1,23 @@
+story_id: STORY-006
+runtime:
+  language: node
+  language_version: ">=18"
+  package_manager: npm
+  build_command: "npm start"
+  build_output_dir: "src/"
+  has_dockerfile: false
+  has_migrations: false
+  exposed_ports: [3000]
+files_modified:
+  - src/ai/essay.js
+  - src/server/routes/essays.js
+  - src/server/index.js
+  - src/public/js/api-client.js
+  - src/public/js/app.js
+  - src/server/routes/profile.js
+commits: []
+warnings:
+  - "essays tile `lastEdited` field added to readSectionDrafts in profile.js to support the dashboard populated state display"
+  - "impact_statements linkage to achievements uses substring matching since achievement IDs in impact_statements.json may differ from achievement item IDs"
+  - "bug-fix pass: renamed all UI labels from 'Essays/Essay' to 'Personal Statements/Statement'; added SPA routes for /essays, /essays/generate, /essays/:id/edit; dashboard card-as-link pattern; navigate to /essays after save; localStorage unsaved-changes restore; preview+wordcount on list cards"
+overall_status: pass

@@ -1,0 +1,24 @@
+story_id: STORY-003a
+runtime:
+  language: node
+  language_version: ">=18"
+  package_manager: npm
+  build_command: "node bin/cli.js"
+  build_output_dir: "src/"
+  has_dockerfile: false
+  has_migrations: false
+  exposed_ports: [3000]
+files_modified:
+  - src/server/routes/essays.js
+  - src/server/routes/impact-statements.js
+  - src/public/js/app.js
+  - src/public/js/api-client.js
+  - src/public/css/custom.css
+commits: []
+gap_specs:
+  - gap-2026-06-15.md
+warnings:
+  - "academic.json uses a rich nested schema (gpa.overall.value) rather than the flat schema in the spec. The GET /api/essays/provenance endpoint handles both schemas."
+  - "The impact picker modal button was relabelled from 'Generate Draft' to 'Start Questionnaire' per AC-1 of the spec."
+  - "Achievement category field in provenance response may be a raw string (e.g. 'academic') rather than normalized (e.g. 'Academic') — depends on how the achievement was stored."
+overall_status: pass

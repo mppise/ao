@@ -1,0 +1,40 @@
+story_id: STORY-001
+runtime:
+  language: node
+  language_version: ">=18.0.0"
+  package_manager: npm
+  build_command: "npm install"
+  build_output_dir: "src/"
+  has_dockerfile: false
+  has_migrations: false
+  exposed_ports: [3000]
+files_modified:
+  - src/server/routes/profile.js
+  - src/public/js/app.js
+  - src/public/js/api-client.js
+  - specs/project-state.yaml
+  - specs/stories/STORY-001/build-report.yaml
+  - (previously) package.json
+  - (previously) bin/cli.js
+  - (previously) src/config/index.js
+  - (previously) src/server/index.js
+  - (previously) src/server/routes/onboarding.js
+  - (previously) src/server/routes/settings.js
+  - (previously) src/utils/file-io.js
+  - (previously) src/utils/profile-init.js
+  - (previously) src/public/index.html
+  - (previously) src/public/css/custom.css
+  - (previously) src/public/js/ui-utils.js
+  - (previously) .env.example
+commits: []
+gap_specs:
+  - gap-2026-06-14.md
+  - gap-2026-06-14-2.md
+warnings:
+  - "Bootstrap CSS and Icons loaded from CDN (jsdelivr.net). Offline usage requires local copies — deferred to a future story."
+  - "uuid@9 deprecation warning during npm install; functionality unaffected for Node.js CommonJS usage."
+  - "The /tmp directory on macOS resolves to /var/folders/... which is blocked by the PROTECTED_PREFIXES list. Test signup must use a home-directory path. This is correct behavior per spec."
+  - "The 'Open Existing Profile' modal flow requires DATA_DIR to already be set in .env. If a user finds an existing profile at a new path, they must update .env manually. A dedicated /api/profile/open endpoint could resolve this in a future gap."
+  - "Enhancement build (gate_bypass:true): replaced showSectionPlaceholder with showAcademicDetail, showTestsDetail, showAchievementsDetail, showActivitiesDetail. Added GET /api/profile/section/:name backend endpoint. impact_statements and essays placeholders now redirect to their proper routes."
+  - "Bug-fix build (gate_bypass:true, v1.1.2): added full CRUD for Activities, Achievements, and AP/IB Exam Scores. AP/IB scores exist in two storage locations (academic.json apIbScores for legacy, tests.json data.ap/data.ib for spec-defined). All new endpoints search both. Documented in gap-2026-06-14.md."
+overall_status: pass

@@ -1,0 +1,15 @@
+{
+  "version": "1.1.0",
+  "date": "2026-06-14",
+  "release_type": "minor",
+  "target": "npm registry (npx ao)",
+  "deployment_order": ["STORY-001", "STORY-002", "STORY-003", "STORY-004", "STORY-005", "STORY-006"],
+  "stories": [
+    {
+      "id": "STORY-001",
+      "title": "Student signup and profile setup",
+      "changes": "Enhancement: Complete detail pages for Academics, Tests, Achievements, and Activities sections. Replaced showSectionPlaceholder with showAcademicDetail, showTestsDetail, showAchievementsDetail, and showActivitiesDetail. Added GET /api/profile/section/:name backend endpoint. impact_statements and essays placeholders now redirect to their proper routes. Proper empty states and back navigation on all detail views."
+    }
+  ],
+  "notes": "Minor release — new UI detail pages for all four profile sections. No breaking changes. No database migrations. No new dependencies."
+}

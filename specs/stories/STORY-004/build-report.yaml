@@ -1,0 +1,33 @@
+story_id: STORY-004
+runtime:
+  language: node
+  language_version: ">=18"
+  package_manager: npm
+  build_command: "node bin/cli.js"
+  build_output_dir: "src/"
+  has_dockerfile: false
+  has_migrations: false
+  exposed_ports: [3000]
+files_modified:
+  - src/ai/impact.js
+  - src/server/routes/impact-statements.js
+  - src/server/index.js
+  - src/public/js/api-client.js
+  - src/public/js/app.js
+commits: []
+gap_specs: []
+warnings:
+  - "achievements.json items use 'title' for achievements and 'activityName' for activities; impact-statements router normalizes both to 'name' for display and prompt building"
+  - "The 'appendAuditLog' utility in file-io.js writes a flat array, not an object with 'entries'; audit writes are wrapped in try/catch so any schema mismatch is non-fatal"
+  - "Screen 5 buttons now match spec exactly: [Edit Draft inline] [Regenerate] [Adjust Answers] [Save As Is] [Discard] — [Regenerate] updates AI draft card only and does NOT overwrite student textarea (AC #13)"
+  - "After save on Screen 5, now redirects to Screen 6 (/impact-statements) rather than dashboard (AC #17)"
+  - "POST /save now stores generatedFrom (studentAnswers, profileDataUsed, focusAreas), reasoning, and editHistory:[] per spec schema (AC #27)"
+  - "PUT /:id now appends to editHistory with editedAt and previousText before updating statement (AC #21)"
+  - "Screen 6 now shows 'Generated from: X of 5 questions answered' or 'profile data only' per card (AC #18)"
+  - "Screen 6 now shows [Regenerate with New Answers] button per card with confirmation prompt (AC #19)"
+  - "Orphaned statements on Screen 6 display grey italic '[Achievement removed]' text prefix (AC #30)"
+  - "Questionnaire modal (Screen 3) now shows progress bar at 25% and 'Step 1 of 4' label (AC #3)"
+  - "Reasoning offcanvas (Screen 2/4) now shows progress bar at 50% and 'Step 2 of 4' label (AC #7)"
+  - "Screen 5 now shows progress bar at 75% and 'Step 3 of 4 — Your Draft' label"
+  - "saveImpactStatement API client updated to accept generatedFrom and reasoning parameters"
+overall_status: pass

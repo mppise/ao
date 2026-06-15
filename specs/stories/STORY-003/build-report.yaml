@@ -1,0 +1,32 @@
+story_id: STORY-003
+runtime:
+  language: node
+  language_version: ">=18"
+  package_manager: npm
+  build_command: "npm start"
+  build_output_dir: "src/"
+  has_dockerfile: false
+  has_migrations: false
+  exposed_ports: [3000]
+files_modified:
+  - src/utils/profile-merge.js
+  - src/server/routes/documents.js
+  - src/server/routes/profile.js
+  - src/public/js/app.js
+  - src/public/js/api-client.js
+commits: []
+gap_specs: []
+warnings:
+  - "BUG 1 (Duplicate handling): coursesMergeMode parameter defaults to add_new to preserve backward compatibility. On re-upload of a transcript, if duplicate courses are detected, the student is shown a dialog with two options: Merge updates or Add as new entries."
+  - "BUG 2 (AP/IB Scores): apIbScores stored in academic.json at top-level (file.apIbScores[]) rather than in file.data.apIbScores to match the extraction data structure used by profile-merge.js."
+  - "Existing courses extracted before STORY-003 do not have id or structured source fields. The UI shows a 'Legacy' label instead of Edit/Delete buttons for these courses. Only newly extracted or manually added courses get full CRUD."
+  - "achievements and activities PUT/DELETE handlers now search both file.data.items[] (manual path) and file.achievements[]/file.activities[] (extraction path) to find items by ID. source field is preserved on all edits."
+  - "profile-merge.js now injects crypto.randomUUID() as id on every course/achievement/activity written during extraction; source object includes type=extracted, documentId (from options.documentId), documentName, extractedAt."
+  - "documents.js review endpoint now passes documentId in mergeOpts so profile-merge can set source.documentId on extracted items."
+  - "_buildSourceBadge() helper added to app.js: returns Bootstrap badge showing source origin for courses, achievements, activities."
+  - "_renderCoursesList() replaces old courses table in showAcademicDetail() with a list-group with per-course source badges and inline Edit/Delete/Confirm-delete UI."
+  - "openCourseEditForm() and _openCourseModal() implement inline form and modal for course edit/create; _buildCourseFormHtml() builds shared form HTML."
+  - "Activities and Achievements detail views updated to show source badges using _buildSourceBadge()."
+  - "New API client functions: getCourses(), updateCourse(), deleteCourse(), createCourse()."
+  - "New backend endpoints: GET /api/profile/academic/courses, PUT /api/profile/academic/course/:id, DELETE /api/profile/academic/course/:id, POST /api/profile/academic/course."
+overall_status: pass

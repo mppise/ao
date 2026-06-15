@@ -1,0 +1,58 @@
+project:
+  name: Admissions Officer
+  created: 2026-06-14
+  release: "1.1.2"
+  next_release_type: minor
+  active_story: STORY-006
+ideation_complete: true
+stories:
+  STORY-001:
+    title: "Student signup and profile setup"
+    depends_on: []
+    spec_done: true
+    built: true
+    deployed: false
+  STORY-002:
+    title: "Document upload and AI classification"
+    depends_on:
+      - STORY-001
+    spec_done: true
+    built: true
+    deployed: true
+  STORY-003:
+    title: "Data extraction and confidence-scored review"
+    depends_on:
+      - STORY-002
+    spec_done: true
+    built: true
+    deployed: false
+  STORY-003a:
+    title: "AI transparency and data provenance display"
+    depends_on:
+      - STORY-003
+    spec_done: true
+    built: true
+    deployed: false
+  STORY-004:
+    title: "Impact statement generation and refinement"
+    depends_on:
+      - STORY-003a
+    spec_done: true
+    built: true
+    deployed: false
+  STORY-005:
+    title: "Profile export (JSON, PDF) and shareable links"
+    depends_on:
+      - STORY-004
+    spec_done: true
+    built: true
+    deployed: true
+  STORY-006:
+    title: "Personal essay draft generation and editing"
+    depends_on:
+      - STORY-004
+      - STORY-003a
+    spec_done: true
+    built: false
+    deployed: false
+

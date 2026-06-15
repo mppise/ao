@@ -1,0 +1,35 @@
+{
+  "name": "admissions-officer",
+  "version": "1.1.2",
+  "description": "AI-assisted college application profile builder for high school seniors",
+  "main": "src/server/index.js",
+  "bin": {
+    "ao": "./bin/cli.js"
+  },
+  "scripts": {
+    "start": "node bin/cli.js",
+    "dev": "node bin/cli.js"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "archiver": "^8.0.0",
+    "body-parser": "^1.20.2",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "multer": "^2.1.1",
+    "pdf-parse": "^2.4.5",
+    "pdfkit": "^0.19.1",
+    "sharp": "^0.35.1",
+    "uuid": "^9.0.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "college",
+    "admissions",
+    "ai",
+    "profile"
+  ],
+  "license": "MIT"
+}
