@@ -4495,6 +4495,32 @@ async function showImpactGenerator(achievement, answersArg) {
       saveBtn.innerHTML = '<i class="bi bi-check2 me-1"></i>Save As Is';
       const code = result.error && result.error.code;
       const msg = (result.error && result.error.message) || 'Save failed. Please try again.';
+
+      // Handle duplicate statement — offer to update instead
+      if (code === 'DUPLICATE_STATEMENT') {
+        const confirmed = confirm(msg + '\n\nWould you like to update the existing statement?');
+        if (confirmed) {
+          // Find existing statement for this achievement
+          const allStmts = await getImpactStatements();
+          if (allStmts.success && allStmts.data && allStmts.data.statements) {
+            const existing = allStmts.data.statements.find(s => s.linkedAchievementId === achievement.id);
+            if (existing) {
+              const updateResult = await updateImpactStatement(existing.id, statementText);
+              if (updateResult.success) {
+                showToast('Impact statement updated.');
+                setTimeout(() => {
+                  showImpactStatementsList();
+                }, 1500);
+                return;
+              } else {
+                showToast((updateResult.error && updateResult.error.message) || 'Update failed.', '', 'danger');
+              }
+            }
+          }
+        }
+        return;
+      }
+
       if (code === 'VALIDATION_ERROR') {
         const errEl = document.getElementById('impact-textarea-error');
         if (errEl) errEl.textContent = msg;
