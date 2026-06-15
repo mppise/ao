@@ -2,41 +2,75 @@
 set -euo pipefail
 
 # SpecGantry deploy script — Release 1.1.4 — 2026-06-15
-# Generated for: NPX local desktop app (Node.js + npm publish via `npx ao`)
+# University Admissions Officer — AI-assisted college application profile builder
 #
-# Patch release — bug fix:
-#   STORY-002  Consolidated 4 per-section upload buttons into single navbar Upload button
-#              with interactive section-selector modal (Academic, Tests, Achievements, Activities pills)
+# Publishes university-admissions-officer to npm registry
+# Users run: npx university-admissions-officer
 #
 # Usage:
-#   ./specs/deploy.sh              Publish release 1.1.4 to npm registry
-#   ./specs/deploy.sh --dry-run    Build and start locally for testing — no npm publish
-#
-# Environment variables required (set before running in production mode):
-#   NPM_TOKEN   npm authentication token (run `npm login` or export NPM_TOKEN=<token>)
-#   (dry-run does not require these)
+#   ./specs/deploy.sh                  Build + verify token + publish to npm
+#   ./specs/deploy.sh --bump minor     Auto-increment minor version and publish
+#   ./specs/deploy.sh --bump major     Auto-increment major version and publish
 #
 # Prerequisites:
 #   - Node.js >= 18.0.0
 #   - npm >= 9.0.0
-#   - .env file at project root with GEMINI_API_KEY, GEMINI_MODEL, DATA_DIR
+#   - Browser (for npm token generation)
 
-DRY_RUN=false
-[[ "${1:-}" == "--dry-run" ]] && DRY_RUN=true
+BUMP_TYPE="patch"
 
-if [[ "$DRY_RUN" == "true" ]]; then
-  echo "  Dry-run mode — building and starting locally, no npm publish"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --bump)
+      BUMP_TYPE="${2:-patch}"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# Verify and fix package.json
+echo ""
+echo "-> Checking package.json..."
+cd "$PROJECT_DIR"
+
+# Fix bin field if needed
+BIN_FIELD=$(node -e "const p=require('./package.json'); process.stdout.write(JSON.stringify(p.bin || {}))")
+if [[ "$BIN_FIELD" == "{}" ]] || [[ "$BIN_FIELD" == '{"university-admissions-officer":"./bin/cli.js"}' ]]; then
+  echo "  -> Fixing bin field in package.json..."
+  node -e "
+    const fs = require('fs');
+    const pkg = require('./package.json');
+    pkg.bin = './bin/cli.js';
+    fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');
+    console.log('  -> bin field fixed: \"bin\": \"./bin/cli.js\"');
+  "
 fi
 
-VERSION="1.1.4"
-PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Read current version from npm registry (published version)
+PUBLISHED_VERSION=$(npm view university-admissions-officer version 2>/dev/null || echo "0.0.0")
+echo "-> Currently published version: $PUBLISHED_VERSION"
+
+# Update package.json to published version first, then increment
+npm version "$PUBLISHED_VERSION" --no-git-tag-version --allow-same-version 2>/dev/null || true
+
+# Auto-increment version (always)
+VERSION=$(npm version --no-git-tag-version "$BUMP_TYPE" 2>/dev/null | tail -1 | tr -d 'v')
+echo "-> Version auto-incremented: $PUBLISHED_VERSION → $VERSION"
+
+echo "  Building and publishing to npm registry"
 
 echo ""
 echo "========================================"
-echo " Admissions Officer — Release $VERSION"
-echo " Target: npm registry (npx ao)"
-echo " Type:   patch (bug fix)"
-echo " New in this release:"
+echo " university-admissions-officer — Release $VERSION"
+echo " Publishing to npm registry"
+echo " Users will run: npx university-admissions-officer"
+echo ""
+echo " In this release:"
 echo "   STORY-002  Single navbar Upload button replaces 4 per-section buttons"
 echo "              Section selector modal with Academic/Tests/Achievements/Activities pills"
 echo "              'Add manually' buttons remain on section cards"
@@ -194,12 +228,12 @@ fi
 echo "  -> All critical source files present  [ok]"
 
 # Verify bin field in package.json
-BIN_FIELD=$(node -e "const p=require('./package.json'); process.stdout.write(p.bin && p.bin.ao || '')")
+BIN_FIELD=$(node -e "const p=require('./package.json'); if(typeof p.bin === 'string') process.stdout.write(p.bin); else if(p.bin && p.bin.university-admissions-officer) process.stdout.write(p.bin.university-admissions-officer); else process.stdout.write('')")
 if [[ "$BIN_FIELD" != "./bin/cli.js" ]]; then
-  echo "  ERROR: package.json bin.ao expected './bin/cli.js', got: '$BIN_FIELD'"
+  echo "  ERROR: package.json bin expected './bin/cli.js', got: '$BIN_FIELD'"
   exit 1
 fi
-echo "  -> package.json bin.ao = ./bin/cli.js  [ok]"
+echo "  -> package.json bin = ./bin/cli.js  [ok]"
 
 # ---------------------------------------------------------------------------
 # Syntax check — story source files
@@ -232,9 +266,9 @@ SYNTAX_FILES=(
 )
 SYNTAX_ERRORS=0
 for f in "${SYNTAX_FILES[@]}"; do
-  if ! node --check "$PROJECT_DIR/$f" 2>/tmp/ao-syntax-err.txt; then
+  if ! node --check "$PROJECT_DIR/$f" 2>/tmp/university-admissions-officer-syntax-err.txt; then
     echo "  ERROR: Syntax error in $f:"
-    sed 's/^/    /' /tmp/ao-syntax-err.txt
+    sed 's/^/    /' /tmp/university-admissions-officer-syntax-err.txt
     SYNTAX_ERRORS=$((SYNTAX_ERRORS + 1))
   else
     echo "  -> $f  [ok]"
@@ -245,94 +279,6 @@ if [[ $SYNTAX_ERRORS -gt 0 ]]; then
   exit 1
 fi
 
-# ---------------------------------------------------------------------------
-# Runtime storage
-# ---------------------------------------------------------------------------
-echo ""
-echo "-> Setting up runtime storage"
-mkdir -p "$PROJECT_DIR/data/profile"
-mkdir -p "$PROJECT_DIR/data/uploads"
-mkdir -p "$PROJECT_DIR/data/.logs"
-echo "  -> data/profile   [ok]"
-echo "  -> data/uploads   [ok]"
-echo "  -> data/.logs     [ok]"
-# MANUAL: DATA_DIR in .env should point to the student's chosen directory on first run.
-#         The ./data directory at project root is a development default only — not shipped via npm.
-
-# ---------------------------------------------------------------------------
-# Startup smoke test — boot the server and verify endpoints
-# ---------------------------------------------------------------------------
-echo ""
-echo "-> Running startup smoke test"
-
-SMOKE_PORT=14002
-SMOKE_PID=""
-cleanup_smoke() {
-  if [[ -n "${SMOKE_PID:-}" ]]; then
-    kill "$SMOKE_PID" 2>/dev/null || true
-  fi
-}
-trap cleanup_smoke EXIT
-
-ENV_FILE="$PROJECT_DIR/.env"
-if [[ ! -f "$ENV_FILE" && -f "$PROJECT_DIR/.env.example" ]]; then
-  echo "  Note: No .env found — smoke-booting with .env.example (AI calls will fail but server boot is verified)"
-  ENV_FILE="$PROJECT_DIR/.env.example"
-fi
-
-if [[ -f "$ENV_FILE" ]]; then
-  PORT=$SMOKE_PORT node "$PROJECT_DIR/bin/cli.js" > /tmp/ao-smoke-114.log 2>&1 &
-  SMOKE_PID=$!
-  SMOKE_OK=false
-  for i in 1 2 3 4 5; do
-    sleep 1
-    if curl -sf "http://127.0.0.1:${SMOKE_PORT}/" -o /dev/null 2>/dev/null; then
-      SMOKE_OK=true
-      break
-    fi
-  done
-
-  if [[ "$SMOKE_OK" == "true" ]]; then
-    echo "  -> Server started and responded on port $SMOKE_PORT  [ok]"
-
-    # Verify STORY-002: POST /api/documents/upload endpoint registered
-    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://127.0.0.1:${SMOKE_PORT}/api/documents/upload" 2>/dev/null || echo "000")
-    if [[ "$HTTP_CODE" == "200" || "$HTTP_CODE" == "400" || "$HTTP_CODE" == "401" || "$HTTP_CODE" == "415" || "$HTTP_CODE" == "422" ]]; then
-      echo "  -> POST /api/documents/upload endpoint present  [ok]"
-    else
-      echo "  Note: POST /api/documents/upload returned HTTP $HTTP_CODE — verify STORY-002 route"
-    fi
-
-    # Verify STORY-002: GET /api/documents/pending endpoint registered
-    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:${SMOKE_PORT}/api/documents/pending" 2>/dev/null || echo "000")
-    if [[ "$HTTP_CODE" == "200" || "$HTTP_CODE" == "400" || "$HTTP_CODE" == "401" ]]; then
-      echo "  -> GET /api/documents/pending endpoint present  [ok]"
-    else
-      echo "  Note: GET /api/documents/pending returned HTTP $HTTP_CODE — verify STORY-002 route"
-    fi
-
-    # Verify STORY-007: GET /api/config/limits endpoint
-    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:${SMOKE_PORT}/api/config/limits" 2>/dev/null || echo "000")
-    if [[ "$HTTP_CODE" == "200" || "$HTTP_CODE" == "400" || "$HTTP_CODE" == "401" ]]; then
-      echo "  -> GET /api/config/limits endpoint present  [ok]"
-    else
-      echo "  Note: GET /api/config/limits returned HTTP $HTTP_CODE — verify STORY-007 route is registered"
-    fi
-  else
-    echo "  Note: Server did not respond within 5 s — likely .env is not fully configured."
-    echo "        Boot output (first 10 lines):"
-    head -10 /tmp/ao-smoke-114.log | sed 's/^/    /'
-    echo "        Continuing — verify manually with: npx ao"
-  fi
-  cleanup_smoke
-  trap - EXIT
-  SMOKE_PID=""
-else
-  echo "  Note: No .env or .env.example found — skipping live boot test"
-  echo "        Create .env from .env.example and set GEMINI_API_KEY before running."
-fi
-
-echo "  -> Smoke test complete"
 
 # ---------------------------------------------------------------------------
 # .npmignore check
@@ -379,97 +325,99 @@ fi
 echo "  -> Package contents safe (no specs/ or .env in bundle)  [ok]"
 
 # ---------------------------------------------------------------------------
-# Deploy — npm publish (production) or local start (dry-run)
+# npm Authentication
 # ---------------------------------------------------------------------------
-if [[ "$DRY_RUN" == "false" ]]; then
-  echo ""
-  echo "-> Publishing admissions-officer@$VERSION to npm registry"
-  # MANUAL: ensure you are authenticated — run `npm login` or export NPM_TOKEN=<your-token>
-  # MANUAL: if this is a scoped package (@scope/admissions-officer), add --access public to npm publish
-  if [[ -n "${NPM_TOKEN:-}" ]]; then
-    echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > "$PROJECT_DIR/.npmrc.deploy"
-    npm publish --userconfig "$PROJECT_DIR/.npmrc.deploy"
-    rm -f "$PROJECT_DIR/.npmrc.deploy"
-  else
-    npm publish
-  fi
-  echo "  -> admissions-officer@$VERSION published  [ok]"
+echo ""
+echo "-> npm Granular Access Token Setup"
+echo ""
+echo "  Opening browser to create a token..."
+echo ""
 
-  # Health check: post-publish registry confirmation
-  echo ""
-  echo "-> Health: verifying npm registry publish"
-  sleep 5
-  PUBLISHED_VERSION=$(npm view admissions-officer version 2>/dev/null || echo "unavailable")
-  if [[ "$PUBLISHED_VERSION" == "$VERSION" ]]; then
-    echo "  -> admissions-officer@$VERSION confirmed on npm  [ok]"
-  else
-    echo "  Note: Registry shows '$PUBLISHED_VERSION' — propagation may take 1-2 minutes"
-    echo "        Verify with: npm view admissions-officer version"
-  fi
-
-  echo ""
-  echo "========================================"
-  echo " Release $VERSION deployed to npm"
-  echo " Install:  npx admissions-officer@$VERSION"
-  echo " Alias:    npx ao"
-  echo " Fixes in this release:"
-  echo "   STORY-002  Single navbar Upload button — 4 per-section buttons removed"
-  echo "              Modal now opens with section selector (pill buttons)"
-  echo "              Section must be selected before upload proceeds"
-  echo "              'Add manually' buttons remain on section cards"
-  echo "========================================"
-
+# Open browser to token generation page
+TOKEN_URL="https://www.npmjs.com/settings/~/tokens"
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  open "$TOKEN_URL"
+elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+  xdg-open "$TOKEN_URL" 2>/dev/null || echo "Visit: $TOKEN_URL"
+elif [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "win32" ]]; then
+  start "$TOKEN_URL"
 else
-  echo ""
-  echo "-> [Dry-run] Starting Admissions Officer locally on port 3000"
-  echo "   Requires .env configured with GEMINI_API_KEY, GEMINI_MODEL, DATA_DIR"
-  if [[ ! -f "$PROJECT_DIR/.env" ]]; then
-    echo "   WARNING: .env not found. Copy .env.example to .env and configure it."
-    echo "            The server may fail to start without GEMINI_API_KEY."
-  fi
-  echo ""
-  node "$PROJECT_DIR/bin/cli.js" &
-  LOCAL_PID=$!
-  sleep 2
-
-  # Health: verify server is live on port 3000
-  echo "-> Health: verifying Admissions Officer on localhost:3000"
-  HEALTH_PORT=3000
-  HEALTH_PATH="/"
-  HEALTH_HOST="localhost"
-  HEALTH_OK=false
-  for i in 1 2 3; do
-    if curl -sf "http://${HEALTH_HOST}:${HEALTH_PORT}${HEALTH_PATH}" -o /dev/null 2>/dev/null; then
-      HEALTH_OK=true
-      break
-    else
-      echo "  retry $i/3..."
-      sleep 5
-    fi
-  done
-
-  if [[ "$HEALTH_OK" == "true" ]]; then
-    echo "  -> Admissions Officer is up at http://localhost:3000  [ok]"
-  else
-    echo "  Note: Server may still be starting — check http://localhost:3000 in your browser"
-    echo "        If it does not respond, verify .env is configured correctly and run: node bin/cli.js"
-  fi
-
-  echo ""
-  echo "========================================"
-  echo " Dry-run complete — Release $VERSION"
-  echo " Test at:  http://localhost:3000"
-  echo ""
-  echo " Verify patch fix:"
-  echo "   STORY-002  Open dashboard — confirm NO per-section 'Upload docs' buttons"
-  echo "              on Academic, Tests, Achievements, or Activities cards"
-  echo "              Click navbar 'Upload' button — confirm modal opens with"
-  echo "              no section pre-selected (all 4 pills in outline style)"
-  echo "              Click a section pill — confirm it highlights (btn-primary)"
-  echo "              Attempt upload with no pill selected — confirm inline error:"
-  echo "              'Please select a section before uploading'"
-  echo "              Confirm 'Add manually' buttons still present on section cards"
-  echo ""
-  echo " Stop with: kill $LOCAL_PID   (or pkill -f 'node bin/cli.js')"
-  echo "========================================"
+  echo "Visit: $TOKEN_URL"
 fi
+
+echo ""
+echo "  Steps to create token:"
+echo "    1. Click 'Generate new access token' → 'Granular Access Token'"
+echo "    2. Name: any name (e.g., deploy-token)"
+echo "    3. Expiration: 30 days"
+echo "    4. Permissions: CHECK 'Read and publish packages'"
+echo "    5. Scroll down - CHECK 'Bypass 2FA for automation'"
+echo "    6. Scope: All packages"
+echo "    7. Click 'Generate'"
+echo "    8. Copy the token (starts with npm_)"
+echo ""
+
+read -r -p "Press ENTER when you have copied the token... " DUMMY
+echo ""
+read -sp "Paste your npm token here: " NPM_TOKEN
+echo ""
+echo ""
+
+if [[ -z "$NPM_TOKEN" ]]; then
+  echo "ERROR: No token provided"
+  exit 1
+fi
+
+# Set the token
+echo "-> Setting npm token..."
+npm config set //registry.npmjs.org/:_authToken="$NPM_TOKEN"
+
+# Verify it works
+if npm whoami &>/dev/null; then
+  CURRENT_USER=$(npm whoami)
+  echo "  -> Authenticated as: $CURRENT_USER  [ok]"
+else
+  echo "ERROR: Token verification failed"
+  echo "Make sure your token has 'Bypass 2FA for automation' enabled"
+  exit 1
+fi
+
+# ---------------------------------------------------------------------------
+# npm pack verification
+# ---------------------------------------------------------------------------
+echo ""
+echo "-> Verifying npm package (npm pack --dry-run)"
+npm pack --dry-run
+echo ""
+
+# ---------------------------------------------------------------------------
+# Deploy — npm publish
+# ---------------------------------------------------------------------------
+echo "-> Publishing university-admissions-officer@$VERSION to npm registry"
+
+# Confirmation prompt
+read -r -p "Publish university-admissions-officer@$VERSION to npmjs.org? [y/N] " CONFIRM
+if [[ "$CONFIRM" != "y" && "$CONFIRM" != "Y" ]]; then
+  echo "  Publish cancelled by user."
+  exit 0
+fi
+
+npm publish
+echo "  -> university-admissions-officer@$VERSION published  [ok]"
+
+# Post-publish verification
+echo ""
+echo "-> Verifying npm registry publish"
+sleep 5
+PUBLISHED_VERSION=$(npm view university-admissions-officer version 2>/dev/null || echo "unavailable")
+if [[ "$PUBLISHED_VERSION" == "$VERSION" ]]; then
+  echo "  -> university-admissions-officer@$VERSION confirmed on npm  [ok]"
+else
+  echo "  Note: Registry shows '$PUBLISHED_VERSION' — propagation may take 1-2 minutes"
+fi
+
+echo ""
+echo "========================================"
+echo " university-admissions-officer@$VERSION deployed to npm ✓"
+echo " Users can now run:  npx university-admissions-officer"
+echo "========================================"

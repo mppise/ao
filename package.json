@@ -1,11 +1,9 @@
 {
-  "name": "ao",
-  "version": "1.1.4",
+  "name": "university-admissions-officer",
+  "version": "1.3.2",
   "description": "AI-assisted college application profile builder for high school seniors",
   "main": "src/server/index.js",
-  "bin": {
-    "ao": "./bin/cli.js"
-  },
+  "bin": "./bin/cli.js",
   "scripts": {
     "start": "node bin/cli.js",
     "dev": "node bin/cli.js"
