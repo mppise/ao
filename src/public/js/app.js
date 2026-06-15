@@ -29,6 +29,29 @@ let reasoningPreviewCache = null; // { achievementId, fetchedAt, data }
  */
 let provenanceSelection = null; // { includeGpa, testScoreIds, achievementIds, impactStatementIds }
 
+/**
+ * Cached limits from config, used across impact statement screens.
+ * Fetched once and reused for all validation and display.
+ */
+let cachedLimits = null;
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+async function fetchLimits() {
+  if (cachedLimits) return cachedLimits;
+  try {
+    const res = await fetch('/api/config/limits');
+    const data = await res.json();
+    if (data.success && data.data.limits) {
+      cachedLimits = data.data.limits;
+      return cachedLimits;
+    }
+  } catch (err) {
+    console.warn('Failed to fetch limits:', err);
+  }
+  return null;
+}
+
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -3165,9 +3188,21 @@ async function openImpactPickerModal() {
  * Called after the student selects an achievement in the picker modal.
  * @param {object} achievement - normalized achievement object
  */
-function openQuestionnaireModal(achievement) {
+async function openQuestionnaireModal(achievement) {
   const existing = document.getElementById('questionnaireModal');
   if (existing) existing.remove();
+
+  // Fetch limits from config
+  let questionnaireMaxWords = 100; // fallback to default
+  try {
+    const limitsRes = await fetch('/api/config/limits');
+    const limitsData = await limitsRes.json();
+    if (limitsData.success && limitsData.data.limits.questionnaireFields) {
+      questionnaireMaxWords = limitsData.data.limits.questionnaireFields.max;
+    }
+  } catch (err) {
+    console.warn('Failed to fetch questionnaire limits, using default:', err);
+  }
 
   const durationParts = [];
   if (achievement.yearsInvolved) durationParts.push(`${achievement.yearsInvolved} year${achievement.yearsInvolved !== 1 ? 's' : ''}`);
@@ -3232,6 +3267,12 @@ function openQuestionnaireModal(achievement) {
   const bsModal = new bootstrap.Modal(modalEl);
   bsModal.show();
 
+  // Update max words in all questionnaire fields
+  ['q-role', 'q-challenge', 'q-growth', 'q-importance', 'q-impact'].forEach(fieldId => {
+    const maxEl = document.getElementById(`${fieldId}-max`);
+    if (maxEl) maxEl.textContent = questionnaireMaxWords;
+  });
+
   // STORY-007: Inject limits banner into modal (async, non-blocking)
   if (typeof renderLimitsBanner === 'function') {
     renderLimitsBanner('questionnaire-limits-banner-container', 'impact');
@@ -3282,12 +3323,11 @@ function _buildQuestionnaireField(id, label, placeholder, answerKey) {
         id="${id}"
         class="form-control"
         rows="3"
-        maxlength="500"
         placeholder="${escapeHtml(placeholder)}"
         data-answer-key="${answerKey}"
         style="resize:vertical;"
       ></textarea>
-      <div class="ao-char-counter mt-1" id="${id}-counter">0 / 500</div>
+      <div class="ao-char-counter mt-1" id="${id}-counter">Words: 0 / <span id="${id}-max">100</span></div>
     </div>
   `;
 }
@@ -3298,18 +3338,21 @@ function _restoreQuestionnaireFields() {
     const el = document.getElementById(id);
     if (el && currentAnswerSheet[key]) {
       el.value = currentAnswerSheet[key];
-      _updateCharCounter(id, currentAnswerSheet[key].length);
+      _updateCharCounter(id, currentAnswerSheet[key]);
     }
   });
 }
 
-function _updateCharCounter(fieldId, len) {
+function _updateCharCounter(fieldId, text) {
   const counter = document.getElementById(`${fieldId}-counter`);
   if (!counter) return;
-  counter.textContent = `${len} / 500`;
+  const wordCount = text.trim() === '' ? 0 : text.trim().split(/\s+/).filter(Boolean).length;
+  const maxEl = document.getElementById(`${fieldId}-max`);
+  const maxWords = maxEl ? parseInt(maxEl.textContent, 10) : 100;
   counter.className = 'ao-char-counter mt-1';
-  if (len >= 500) counter.classList.add('danger');
-  else if (len >= 450) counter.classList.add('warn');
+  counter.innerHTML = `Words: ${wordCount} / <span id="${fieldId}-max">${maxWords}</span>`;
+  if (wordCount > maxWords) counter.classList.add('danger');
+  else if (wordCount >= Math.ceil(maxWords * 0.9)) counter.classList.add('warn');
 }
 
 function _bindQuestionnaireLiveSync() {
@@ -4139,6 +4182,18 @@ async function showImpactGenerator(achievement, answersArg) {
   // Keep a mutable reference to the answers so Adjust Answers can go back with pre-filled answers
   let answers = answersArg ? Object.assign({}, answersArg) : null;
 
+  // Fetch limits from config
+  let impactMaxWords = 200; // fallback to default
+  try {
+    const limitsRes = await fetch('/api/config/limits');
+    const limitsData = await limitsRes.json();
+    if (limitsData.success && limitsData.data.limits.impactStatements) {
+      impactMaxWords = limitsData.data.limits.impactStatements.max;
+    }
+  } catch (err) {
+    console.warn('Failed to fetch limits, using default:', err);
+  }
+
   // Initial layout
   renderTemplate(`
     <div class="mb-3">
@@ -4188,7 +4243,7 @@ async function showImpactGenerator(achievement, answersArg) {
       ></textarea>
       <div class="d-flex justify-content-between mt-1">
         <div id="impact-textarea-error" class="text-danger small"></div>
-        <span class="text-muted small">Words: <span id="impact-word-count">0</span> / 200</span>
+        <span class="text-muted small">Words: <span id="impact-word-count">0</span> / <span id="impact-word-max">200</span></span>
       </div>
     </div>
 
@@ -4233,6 +4288,10 @@ async function showImpactGenerator(achievement, answersArg) {
     appNavigate('/');
   });
 
+  // Set the max words display
+  const maxWordsDisplay = document.getElementById('impact-word-max');
+  if (maxWordsDisplay) maxWordsDisplay.textContent = impactMaxWords;
+
   // Word counter
   const textarea = document.getElementById('impact-statement-textarea');
   textarea.addEventListener('input', () => {
@@ -4256,8 +4315,8 @@ async function showImpactGenerator(achievement, answersArg) {
       if (saveBtn) saveBtn.disabled = true;
       return false;
     }
-    if (wordCount > 200) {
-      if (errorEl) errorEl.textContent = 'Statement is too long (max 200 words).';
+    if (wordCount > impactMaxWords) {
+      if (errorEl) errorEl.textContent = `Statement is too long (max ${impactMaxWords} words).`;
       if (saveBtn) saveBtn.disabled = true;
       return false;
     }
@@ -4760,13 +4819,12 @@ async function _loadAndRenderImpactList() {
           <textarea
             class="form-control mb-1 impact-inline-edit-textarea"
             rows="5"
-            maxlength="1000"
             data-id="${escapeHtml(s.id)}"
             data-original="${escapeHtml(s.statement || '')}"
           >${escapeHtml(s.statement || '')}</textarea>
           <div class="d-flex justify-content-between mb-2">
             <div class="text-danger small impact-inline-edit-error" id="inline-edit-error-${escapeHtml(s.id)}"></div>
-            <span class="text-muted small"><span class="impact-inline-char-count" id="inline-char-count-${escapeHtml(s.id)}">${(s.statement || '').length}</span> / 1000</span>
+            <span class="text-muted small">Words: <span class="impact-inline-word-count" id="inline-word-count-${escapeHtml(s.id)}">0</span> / <span class="inline-max-words" id="inline-max-${escapeHtml(s.id)}">150</span></span>
           </div>
           <div class="d-flex gap-2">
             <button class="btn btn-sm btn-primary btn-save-inline-edit" data-id="${escapeHtml(s.id)}" disabled>
@@ -4793,11 +4851,12 @@ async function _loadAndRenderImpactList() {
     ta.addEventListener('input', () => {
       const stId = ta.dataset.id;
       const original = ta.dataset.original;
-      const charCount = document.getElementById(`inline-char-count-${stId}`);
+      const wordCount = ta.value.trim() === '' ? 0 : ta.value.trim().split(/\s+/).filter(Boolean).length;
+      const wordCountEl = document.getElementById(`inline-word-count-${stId}`);
       const errorEl = document.getElementById(`inline-edit-error-${stId}`);
       const saveBtn = listEl.querySelector(`.btn-save-inline-edit[data-id="${stId}"]`);
-      if (charCount) charCount.textContent = ta.value.length;
-      _validateInlineEdit(ta, original, errorEl, saveBtn);
+      if (wordCountEl) wordCountEl.textContent = wordCount;
+      _validateInlineEdit(ta, original, errorEl, saveBtn, stId);
     });
   });
 
@@ -4816,7 +4875,7 @@ async function _loadAndRenderImpactList() {
       const ta = listEl.querySelector(`.impact-inline-edit-textarea[data-id="${stId}"]`);
       const original = ta.dataset.original;
       const errorEl = document.getElementById(`inline-edit-error-${stId}`);
-      if (!_validateInlineEdit(ta, original, errorEl, btn)) return;
+      if (!_validateInlineEdit(ta, original, errorEl, btn, stId)) return;
 
       const newText = ta.value.trim();
       btn.disabled = true;
@@ -5012,6 +5071,21 @@ async function _loadAndRenderImpactList() {
       openQuestionnaireModal(achievement);
     });
   });
+
+  // Fetch and set impact statement word limits in inline editors
+  const limits = await fetchLimits();
+  const impactMaxWords = limits && limits.impactStatements ? limits.impactStatements.max : 150;
+  listEl.querySelectorAll('.inline-max-words').forEach(el => {
+    el.textContent = impactMaxWords;
+  });
+
+  // Update word counts for initially rendered statements
+  listEl.querySelectorAll('.impact-inline-edit-textarea').forEach(ta => {
+    const stId = ta.dataset.id;
+    const wordCount = ta.value.trim() === '' ? 0 : ta.value.trim().split(/\s+/).filter(Boolean).length;
+    const wordCountEl = document.getElementById(`inline-word-count-${stId}`);
+    if (wordCountEl) wordCountEl.textContent = wordCount;
+  });
 }
 
 /**
@@ -5067,15 +5141,18 @@ function _closeInlineEdit(stId) {
  * Validate the inline edit textarea.
  * @returns {boolean} true if valid
  */
-function _validateInlineEdit(ta, original, errorEl, saveBtn) {
+function _validateInlineEdit(ta, original, errorEl, saveBtn, stId) {
   const val = ta.value.trim();
   if (val.length === 0) {
     if (errorEl) errorEl.textContent = 'Statement cannot be empty.';
     if (saveBtn) saveBtn.disabled = true;
     return false;
   }
-  if (val.length > 1000) {
-    if (errorEl) errorEl.textContent = 'Statement is too long (max 1000 characters).';
+  const wordCount = val.split(/\s+/).filter(Boolean).length;
+  const maxEl = stId ? document.getElementById(`inline-max-${stId}`) : null;
+  const maxWords = maxEl ? parseInt(maxEl.textContent, 10) : 150;
+  if (wordCount > maxWords) {
+    if (errorEl) errorEl.textContent = `Statement is too long (max ${maxWords} words).`;
     if (saveBtn) saveBtn.disabled = true;
     return false;
   }
@@ -5155,10 +5232,24 @@ function showEssayGenerationError(result) {
  * @param {object} draft - draft object from API
  * @param {boolean} isNew - true if freshly generated (not from list)
  */
-function showEssayEditScreen(draft, isNew) {
+async function showEssayEditScreen(draft, isNew) {
   showNavbar();
   history.pushState({ page: 'essay-edit', id: draft.id }, '', `/essays/${draft.id}/edit`);
   document.title = 'Edit Personal Statement — Admissions Officer';
+
+  // Fetch essay limits from config
+  let essayMinWords = 500; // fallback to default
+  let essayMaxWords = 650; // fallback to default
+  try {
+    const limitsRes = await fetch('/api/config/limits');
+    const limitsData = await limitsRes.json();
+    if (limitsData.success && limitsData.data.limits.essays) {
+      essayMinWords = limitsData.data.limits.essays.min;
+      essayMaxWords = limitsData.data.limits.essays.max;
+    }
+  } catch (err) {
+    console.warn('Failed to fetch essay limits, using default:', err);
+  }
 
   const aiDraftText = draft.aiDraft || '';
   // For new drafts: studentEdit starts prefilled with aiDraft
@@ -5217,7 +5308,7 @@ function showEssayEditScreen(draft, isNew) {
 
         <!-- Word count -->
         <div class="text-muted small mb-3">
-          Words: <strong id="essay-word-count">0</strong> / Target: 500–650
+          Words: <strong id="essay-word-count">0</strong> / Target: <span id="essay-limits-display">500–650</span>
         </div>
 
         <div class="d-flex gap-2 flex-wrap">
@@ -5235,6 +5326,10 @@ function showEssayEditScreen(draft, isNew) {
 
   // STORY-003a: Wire sources panel collapse toggle
   _wireCollapseToggle('essay-sources-collapse-toggle', 'essay-sources-collapse', 'Sources used in this draft', 'Hide sources');
+
+  // Set essay limits display
+  const limitsDisplay = document.getElementById('essay-limits-display');
+  if (limitsDisplay) limitsDisplay.textContent = `${essayMinWords}–${essayMaxWords}`;
 
   const textarea = document.getElementById('essay-textarea');
   const wordCountEl = document.getElementById('essay-word-count');

@@ -1,0 +1,29 @@
+[Unit]
+Description=Admissions Officer — AI-assisted college application profile builder
+After=network.target
+Documentation=https://github.com/anthropics/claude-code
+
+[Service]
+Type=simple
+User=ao-app
+Group=ao-app
+WorkingDirectory=/opt/admissions-officer
+Environment="NODE_ENV=production"
+EnvironmentFile=/opt/admissions-officer/.env
+
+# Start service
+ExecStart=/usr/bin/node /opt/admissions-officer/bin/cli.js
+Restart=always
+RestartSec=10
+
+# Resource limits
+LimitNOFILE=65536
+MemoryLimit=512M
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ao
+
+[Install]
+WantedBy=multi-user.target

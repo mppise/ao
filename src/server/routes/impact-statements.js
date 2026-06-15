@@ -238,12 +238,12 @@ router.post('/generate', async (req, res) => {
   try {
     const result = await generateImpactStatement(norm, answers);
 
-    // Enforce character count limits
+    // Enforce word count limits
     const limits = getLimits();
     const impactLimits = limits.limits.impactStatements;
-    const charCount = result.draft.length;
-    if (charCount < impactLimits.min || charCount > impactLimits.max) {
-      console.warn(`[impact-statements/generate] AI draft is ${charCount} characters, limit is ${impactLimits.min}–${impactLimits.max}`);
+    const draftWordCount = result.draft.trim().split(/\s+/).filter(Boolean).length;
+    if (draftWordCount < impactLimits.min || draftWordCount > impactLimits.max) {
+      console.warn(`[impact-statements/generate] AI draft is ${draftWordCount} words, limit is ${impactLimits.min}–${impactLimits.max}`);
     }
 
     return res.json(envelope(true, {
@@ -276,8 +276,11 @@ router.post('/save', (req, res) => {
   if (typeof statement !== 'string' || statement.trim().length === 0) {
     return res.status(400).json(envelope(false, null, { code: 'VALIDATION_ERROR', message: 'Statement cannot be empty.' }));
   }
-  if (statement.trim().length > 1000) {
-    return res.status(400).json(envelope(false, null, { code: 'VALIDATION_ERROR', message: 'Statement exceeds 1000 characters.' }));
+  const wordCount = statement.trim().split(/\s+/).filter(Boolean).length;
+  const limits = getLimits();
+  const impactLimits = limits.limits.impactStatements;
+  if (wordCount > impactLimits.max) {
+    return res.status(400).json(envelope(false, null, { code: 'VALIDATION_ERROR', message: `Statement exceeds ${impactLimits.max} words.` }));
   }
   if (typeof aiGenerated !== 'boolean') {
     return res.status(400).json(envelope(false, null, { code: 'VALIDATION_ERROR', message: 'aiGenerated must be a boolean.' }));
@@ -401,8 +404,11 @@ router.put('/:id', (req, res) => {
   if (typeof statement !== 'string' || statement.trim().length === 0) {
     return res.status(400).json(envelope(false, null, { code: 'VALIDATION_ERROR', message: 'Statement cannot be empty.' }));
   }
-  if (statement.trim().length > 1000) {
-    return res.status(400).json(envelope(false, null, { code: 'VALIDATION_ERROR', message: 'Statement exceeds 1000 characters.' }));
+  const wordCount = statement.trim().split(/\s+/).filter(Boolean).length;
+  const limits = getLimits();
+  const impactLimits = limits.limits.impactStatements;
+  if (wordCount > impactLimits.max) {
+    return res.status(400).json(envelope(false, null, { code: 'VALIDATION_ERROR', message: `Statement exceeds ${impactLimits.max} words.` }));
   }
 
   const profileDir = getProfileDir();
