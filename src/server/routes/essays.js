@@ -86,11 +86,12 @@ router.get('/provenance', (req, res) => {
   const profileDir = path.join(dataDir, 'profile');
   const warnings = [];
   let gpa = null;
+  let courses = null;
   let testScores = null;
   let achievements = null;
   let impactStatements = null;
 
-  // Read academic.json → GPA
+  // Read academic.json → GPA and courses
   try {
     const academicData = readJSON(path.join(profileDir, 'academic.json'));
     // Support both simple schema (data.gpa) and rich schema (top-level gpa.overall.value)
@@ -121,6 +122,23 @@ router.get('/provenance', (req, res) => {
         confidence: gpaConf,
         source: gpaSrc,
       };
+    }
+
+    // Read courses (merged schema: top-level courses[], init schema: data.courses[])
+    let courseList = [];
+    if (academicData && Array.isArray(academicData.courses) && academicData.courses.length > 0) {
+      courseList = academicData.courses;
+    } else if (academicData && academicData.data && Array.isArray(academicData.data.courses)) {
+      courseList = academicData.data.courses;
+    }
+    if (courseList.length > 0) {
+      courses = courseList.map(c => {
+        if (typeof c === 'string') return c;
+        let label = c.name || '';
+        if (c.level) label += ` (${c.level})`;
+        if (c.grade != null) label += ` — ${c.grade}`;
+        return label;
+      }).filter(Boolean);
     }
   } catch (err) {
     if (err.code !== 'ENOENT') {
@@ -270,7 +288,7 @@ router.get('/provenance', (req, res) => {
     }
   }
 
-  const responseData = { gpa, testScores, achievements, impactStatements };
+  const responseData = { gpa, courses, testScores, achievements, impactStatements };
   const response = envelope(true, responseData);
   if (warnings.length > 0) response.warnings = warnings;
   return res.json(response);

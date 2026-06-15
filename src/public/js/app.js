@@ -3750,6 +3750,19 @@ async function _fetchAndRenderProvenance(bsModal, modalEl) {
         </div>`;
     }
 
+    // Courses (display-only, always included)
+    if (data.courses && data.courses.length > 0) {
+      const coursesList = data.courses.slice(0, 10).map(c => escapeHtml(c)).join('<br>');
+      sectionsHtml += `
+        <div class="card mb-3">
+          <div class="card-header fw-semibold"><i class="bi bi-book me-1"></i>Courses (included)</div>
+          <div class="card-body py-2" style="font-size: 0.9rem;">
+            <div class="text-muted small mb-2">Courses are automatically included in essay generation.</div>
+            ${coursesList}
+          </div>
+        </div>`;
+    }
+
     // Achievements & activities
     if (data.achievements && data.achievements.length > 0) {
       const rows = data.achievements.map(a => {
