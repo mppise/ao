@@ -42,7 +42,19 @@ function readAchievementsAll(profileDir) {
   for (const file of ['achievements.json', 'activities.json']) {
     try {
       const data = readJSON(path.join(profileDir, file));
-      const items = (data.data && data.data.items) || [];
+      let items = [];
+      if (file === 'achievements.json') {
+        // Merged schema: top-level array
+        items = Array.isArray(data.achievements) ? data.achievements
+          // Init schema: wrapped under data.items
+          : (data.data && Array.isArray(data.data.items)) ? data.data.items
+          : [];
+      } else {
+        // activities.json
+        items = Array.isArray(data.activities) ? data.activities
+          : (data.data && Array.isArray(data.data.items)) ? data.data.items
+          : [];
+      }
       const source = file === 'achievements.json' ? 'achievement' : 'activity';
       items.forEach(item => achievements.push({ ...item, _source: source }));
     } catch (_) { /* file missing is ok */ }
