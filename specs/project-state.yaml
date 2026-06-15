@@ -1,8 +1,8 @@
 project:
   name: Admissions Officer
   created: 2026-06-14
-  release: "1.1.4"
-  next_release_type: minor
+  release: "1.4.0"
+  next_release_type: null
   active_story: null
 ideation_complete: true
 stories:
@@ -54,7 +54,7 @@ stories:
       - STORY-003a
     spec_done: true
     built: true
-    deployed: false
+    deployed: true
   STORY-007:
     title: "Configurable word limits & college guideline presets"
     depends_on: []

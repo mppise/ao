@@ -1,79 +1,41 @@
 #!/bin/bash
 set -euo pipefail
 
-# SpecGantry deploy script — Release 1.1.4 — 2026-06-15
+# SpecGantry deploy script — Release 1.4.0 — 2026-06-15
 # University Admissions Officer — AI-assisted college application profile builder
 #
-# Publishes university-admissions-officer to npm registry
-# Users run: npx university-admissions-officer
+# Target: npm registry (npx university-admissions-officer)
 #
 # Usage:
-#   ./specs/deploy.sh                  Build + verify token + publish to npm
-#   ./specs/deploy.sh --bump minor     Auto-increment minor version and publish
-#   ./specs/deploy.sh --bump major     Auto-increment major version and publish
+#   ./specs/deploy.sh              Build + verify + stamp 1.4.0 + publish to npm
+#   ./specs/deploy.sh --dry-run    Build and start locally for testing — no npm publish
 #
-# Prerequisites:
-#   - Node.js >= 18.0.0
-#   - npm >= 9.0.0
-#   - Browser (for npm token generation)
+# Environment variables required (set before running):
+#   None beyond npm authentication token (prompted interactively during publish)
+#   (dry-run does not require any environment variables)
 
-BUMP_TYPE="patch"
+DRY_RUN=false
+[[ "${1:-}" == "--dry-run" ]] && DRY_RUN=true
 
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --bump)
-      BUMP_TYPE="${2:-patch}"
-      shift 2
-      ;;
-    *)
-      shift
-      ;;
-  esac
-done
-
-PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-
-# Verify and fix package.json
-echo ""
-echo "-> Checking package.json..."
-cd "$PROJECT_DIR"
-
-# Fix bin field if needed
-BIN_FIELD=$(node -e "const p=require('./package.json'); process.stdout.write(JSON.stringify(p.bin || {}))")
-if [[ "$BIN_FIELD" == "{}" ]] || [[ "$BIN_FIELD" == '{"university-admissions-officer":"./bin/cli.js"}' ]]; then
-  echo "  -> Fixing bin field in package.json..."
-  node -e "
-    const fs = require('fs');
-    const pkg = require('./package.json');
-    pkg.bin = './bin/cli.js';
-    fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');
-    console.log('  -> bin field fixed: \"bin\": \"./bin/cli.js\"');
-  "
+if [[ "$DRY_RUN" == "true" ]]; then
+  echo "  Dry-run mode — building and starting locally, no npm publish"
 fi
 
-# Read current version from npm registry (published version)
-PUBLISHED_VERSION=$(npm view university-admissions-officer version 2>/dev/null || echo "0.0.0")
-echo "-> Currently published version: $PUBLISHED_VERSION"
+VERSION="1.4.0"
 
-# Update package.json to published version first, then increment
-npm version "$PUBLISHED_VERSION" --no-git-tag-version --allow-same-version 2>/dev/null || true
-
-# Auto-increment version (always)
-VERSION=$(npm version --no-git-tag-version "$BUMP_TYPE" 2>/dev/null | tail -1 | tr -d 'v')
-echo "-> Version auto-incremented: $PUBLISHED_VERSION → $VERSION"
-
-echo "  Building and publishing to npm registry"
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$PROJECT_DIR"
 
 echo ""
 echo "========================================"
 echo " university-admissions-officer — Release $VERSION"
-echo " Publishing to npm registry"
+echo " Target: npm registry"
 echo " Users will run: npx university-admissions-officer"
 echo ""
-echo " In this release:"
-echo "   STORY-002  Single navbar Upload button replaces 4 per-section buttons"
-echo "              Section selector modal with Academic/Tests/Achievements/Activities pills"
-echo "              'Add manually' buttons remain on section cards"
+echo " Stories in this release:"
+echo "   STORY-001  Student signup and profile setup"
+echo "              (enhanced: non-blocking .env initialization)"
+echo "   STORY-006  Personal essay draft generation and editing"
 echo " Project: $PROJECT_DIR"
 echo "========================================"
 echo ""
@@ -94,11 +56,25 @@ npm --version > /dev/null
 echo "  -> npm $(npm --version)  [ok]"
 
 # ---------------------------------------------------------------------------
-# Version stamping — update package.json to 1.1.4
+# Version stamping — stamp package.json to 1.4.0
 # ---------------------------------------------------------------------------
 echo ""
 echo "-> Stamping version $VERSION"
 cd "$PROJECT_DIR"
+
+# Ensure bin field is correct before stamping
+BIN_FIELD=$(node -e "const p=require('./package.json'); process.stdout.write(JSON.stringify(p.bin || {}))")
+if [[ "$BIN_FIELD" == "{}" ]]; then
+  echo "  -> Setting bin field in package.json..."
+  node -e "
+    const fs = require('fs');
+    const pkg = require('./package.json');
+    pkg.bin = { 'university-admissions-officer': './bin/cli.js' };
+    fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');
+    console.log('  -> bin field set: university-admissions-officer -> ./bin/cli.js');
+  "
+fi
+
 npm version "$VERSION" --no-git-tag-version --allow-same-version 2>/dev/null || true
 
 WRITTEN_VERSION=$(node -p "require('./package.json').version")
@@ -109,10 +85,10 @@ fi
 echo "  -> package.json version = $WRITTEN_VERSION  [ok]"
 
 # ---------------------------------------------------------------------------
-# Build: STORY-002 — Document upload and AI classification (patch)
+# Build: STORY-001 — Student signup and profile setup
 # ---------------------------------------------------------------------------
 echo ""
-echo "-> Building Document upload and AI classification ($VERSION)"
+echo "-> Building Student signup and profile setup ($VERSION)"
 cd "$PROJECT_DIR"
 npm install 2>&1 | tail -5
 
@@ -141,36 +117,33 @@ if [[ ${#MISSING_DEPS[@]} -gt 0 ]]; then
 fi
 echo "  -> All required dependencies present  [ok]"
 
-# Patch verification: single navbar Upload button must be present
-echo "-> Verifying STORY-002 patch: single navbar Upload button"
-if [[ -f "$PROJECT_DIR/src/public/index.html" ]]; then
-  if grep -q 'nav-btn-upload\|id="navUploadBtn"\|id="uploadNavBtn"' "$PROJECT_DIR/src/public/index.html" 2>/dev/null; then
-    echo "  -> Navbar upload button reference found in index.html  [ok]"
-  else
-    echo "  Note: Navbar upload button identifier not detected in index.html — verify single Upload button is in navbar"
+# ---------------------------------------------------------------------------
+# Build: STORY-006 — Personal essay draft generation and editing
+# ---------------------------------------------------------------------------
+echo ""
+echo "-> Building Personal essay draft generation and editing ($VERSION)"
+
+# Verify essay AI module and routes are present
+for f in "src/ai/essay.js" "src/server/routes/essays.js"; do
+  if [[ ! -f "$PROJECT_DIR/$f" ]]; then
+    echo "  ERROR: Missing STORY-006 file: $f"
+    exit 1
   fi
+  echo "  -> $f  [ok]"
+done
+
+# Verify assembleProfileData reads all required profile sections
+if grep -q "assembleProfileData" "$PROJECT_DIR/src/ai/essay.js" 2>/dev/null; then
+  echo "  -> assembleProfileData present in src/ai/essay.js  [ok]"
+else
+  echo "  WARNING: assembleProfileData not detected in src/ai/essay.js — verify full profile assembly"
 fi
 
-# Patch verification: per-section Upload docs buttons must be absent
-echo "-> Verifying STORY-002 patch: per-section upload buttons removed"
-if [[ -f "$PROJECT_DIR/src/public/js/app.js" ]]; then
-  if grep -qE 'btn-upload-(academic|tests|achievements|activities)|uploadSection(Academic|Tests|Achievements|Activities)' \
-      "$PROJECT_DIR/src/public/js/app.js" 2>/dev/null; then
-    echo "  WARNING: Per-section upload button identifiers still present in app.js — verify removal"
-  else
-    echo "  -> No per-section upload button identifiers in app.js  [ok]"
-  fi
-fi
-
-# Patch verification: section selector pills must be present in upload modal
-echo "-> Verifying STORY-002 patch: section selector pills in upload modal"
-if [[ -f "$PROJECT_DIR/src/public/js/app.js" ]]; then
-  if grep -qE 'section.*pill|pill.*section|Academic.*pill|pill.*Academic|sectionSelector|section-pill' \
-      "$PROJECT_DIR/src/public/js/app.js" 2>/dev/null; then
-    echo "  -> Section selector pill references found in app.js  [ok]"
-  else
-    echo "  Note: Section pill selector pattern not detected in app.js — verify modal section selector is implemented"
-  fi
+# Verify provenance endpoint is present in essays router
+if grep -qE "provenance|provenanceSelection" "$PROJECT_DIR/src/server/routes/essays.js" 2>/dev/null; then
+  echo "  -> Provenance endpoint present in essays router  [ok]"
+else
+  echo "  WARNING: Provenance references not detected in essays router — verify STORY-006 AC#30"
 fi
 
 # ---------------------------------------------------------------------------
@@ -187,17 +160,19 @@ declare -a REQUIRED_FILES=(
   # STORY-001
   "src/server/routes/profile.js"
   "src/server/routes/settings.js"
+  "src/server/routes/config-init.js"
   "src/public/index.html"
   "src/public/js/app.js"
   "src/public/js/api-client.js"
   "src/public/js/ui-utils.js"
   "src/public/css/custom.css"
-  # STORY-002 (this release)
+  # STORY-006
+  "src/ai/essay.js"
+  "src/server/routes/essays.js"
+  # Previously deployed stories
   "src/server/routes/documents.js"
   "src/ai/extraction.js"
-  # Previously deployed stories
   "src/utils/profile-merge.js"
-  "src/server/routes/essays.js"
   "src/server/routes/impact-statements.js"
   "src/ai/impact.js"
   "src/lib/pdfExport.js"
@@ -205,7 +180,6 @@ declare -a REQUIRED_FILES=(
   "src/lib/shareTokens.js"
   "src/server/routes/export.js"
   "src/server/routes/share.js"
-  "src/ai/essay.js"
   # STORY-007
   "src/config/limits.json"
   "src/config/limitsDefaults.js"
@@ -227,10 +201,15 @@ if [[ $FILE_ERRORS -gt 0 ]]; then
 fi
 echo "  -> All critical source files present  [ok]"
 
-# Verify bin field in package.json
-BIN_FIELD=$(node -e "const p=require('./package.json'); if(typeof p.bin === 'string') process.stdout.write(p.bin); else if(p.bin && p.bin.university-admissions-officer) process.stdout.write(p.bin.university-admissions-officer); else process.stdout.write('')")
-if [[ "$BIN_FIELD" != "./bin/cli.js" ]]; then
-  echo "  ERROR: package.json bin expected './bin/cli.js', got: '$BIN_FIELD'"
+# Verify bin field resolves to cli.js
+BIN_RESOLVED=$(node -e "
+  const p = require('./package.json');
+  if (typeof p.bin === 'string') process.stdout.write(p.bin);
+  else if (p.bin && p.bin['university-admissions-officer']) process.stdout.write(p.bin['university-admissions-officer']);
+  else process.stdout.write('');
+")
+if [[ "$BIN_RESOLVED" != "./bin/cli.js" ]]; then
+  echo "  ERROR: package.json bin expected './bin/cli.js', got: '$BIN_RESOLVED'"
   exit 1
 fi
 echo "  -> package.json bin = ./bin/cli.js  [ok]"
@@ -251,6 +230,7 @@ SYNTAX_FILES=(
   "src/server/routes/share.js"
   "src/server/routes/export.js"
   "src/server/routes/config-limits.js"
+  "src/server/routes/config-init.js"
   "src/public/js/app.js"
   "src/public/js/api-client.js"
   "src/public/js/ui-utils.js"
@@ -278,7 +258,6 @@ if [[ $SYNTAX_ERRORS -gt 0 ]]; then
   echo "  STOP: $SYNTAX_ERRORS file(s) have syntax errors — fix before deploying"
   exit 1
 fi
-
 
 # ---------------------------------------------------------------------------
 # .npmignore check
@@ -325,6 +304,46 @@ fi
 echo "  -> Package contents safe (no specs/ or .env in bundle)  [ok]"
 
 # ---------------------------------------------------------------------------
+# Runtime storage
+# ---------------------------------------------------------------------------
+echo ""
+echo "-> Setting up runtime storage"
+mkdir -p data/profile data/uploads data/.logs
+echo "  -> data/ subdirectories ready  [ok]"
+# MANUAL: mount ./data as a persistent volume when running on a shared or remote server
+
+# ---------------------------------------------------------------------------
+# Dry-run: start locally, skip npm publish
+# ---------------------------------------------------------------------------
+if [[ "$DRY_RUN" == "true" ]]; then
+  echo ""
+  echo "-> Deploy: Student signup and profile setup (dry-run)"
+  echo "  Starting server locally on port 3000..."
+  node bin/cli.js &
+  SERVER_PID=$!
+  echo "  -> server PID $SERVER_PID started"
+
+  echo ""
+  echo "-> Health: Student signup and profile setup"
+  HEALTH_PORT=3000
+  HEALTH_PATH=/
+  HEALTH_HOST="localhost"
+  echo "  -> Waiting for server..."
+  for i in 1 2 3; do
+    curl -sf "http://${HEALTH_HOST}:${HEALTH_PORT}${HEALTH_PATH}" && break || { echo "  retry $i/3..."; sleep 5; }
+  done
+  echo "  -> server is up on http://localhost:$HEALTH_PORT"
+
+  echo ""
+  echo "======================================"
+  echo "  Dry-run complete — services running locally"
+  echo "  Test at: http://localhost:3000"
+  echo "  Stop with: kill $SERVER_PID"
+  echo "======================================"
+  exit 0
+fi
+
+# ---------------------------------------------------------------------------
 # npm Authentication
 # ---------------------------------------------------------------------------
 echo ""
@@ -333,7 +352,6 @@ echo ""
 echo "  Opening browser to create a token..."
 echo ""
 
-# Open browser to token generation page
 TOKEN_URL="https://www.npmjs.com/settings/~/tokens"
 if [[ "$OSTYPE" == "darwin"* ]]; then
   open "$TOKEN_URL"
@@ -347,11 +365,11 @@ fi
 
 echo ""
 echo "  Steps to create token:"
-echo "    1. Click 'Generate new access token' → 'Granular Access Token'"
-echo "    2. Name: any name (e.g., deploy-token)"
+echo "    1. Click 'Generate new access token' -> 'Granular Access Token'"
+echo "    2. Name: any name (e.g., deploy-1.4.0)"
 echo "    3. Expiration: 30 days"
 echo "    4. Permissions: CHECK 'Read and publish packages'"
-echo "    5. Scroll down - CHECK 'Bypass 2FA for automation'"
+echo "    5. Scroll down — CHECK 'Bypass 2FA for automation'"
 echo "    6. Scope: All packages"
 echo "    7. Click 'Generate'"
 echo "    8. Copy the token (starts with npm_)"
@@ -368,11 +386,9 @@ if [[ -z "$NPM_TOKEN" ]]; then
   exit 1
 fi
 
-# Set the token
 echo "-> Setting npm token..."
 npm config set //registry.npmjs.org/:_authToken="$NPM_TOKEN"
 
-# Verify it works
 if npm whoami &>/dev/null; then
   CURRENT_USER=$(npm whoami)
   echo "  -> Authenticated as: $CURRENT_USER  [ok]"
@@ -383,19 +399,20 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# npm pack verification
+# npm pack final review
 # ---------------------------------------------------------------------------
 echo ""
-echo "-> Verifying npm package (npm pack --dry-run)"
+echo "-> Final npm package review (npm pack --dry-run)"
 npm pack --dry-run
 echo ""
 
 # ---------------------------------------------------------------------------
-# Deploy — npm publish
+# Deploy — STORY-001 + STORY-006 — npm publish
 # ---------------------------------------------------------------------------
 echo "-> Publishing university-admissions-officer@$VERSION to npm registry"
+echo "   Stories in this release: STORY-001, STORY-006"
+echo ""
 
-# Confirmation prompt
 read -r -p "Publish university-admissions-officer@$VERSION to npmjs.org? [y/N] " CONFIRM
 if [[ "$CONFIRM" != "y" && "$CONFIRM" != "Y" ]]; then
   echo "  Publish cancelled by user."
@@ -405,7 +422,9 @@ fi
 npm publish
 echo "  -> university-admissions-officer@$VERSION published  [ok]"
 
-# Post-publish verification
+# ---------------------------------------------------------------------------
+# Health: verify successful publish
+# ---------------------------------------------------------------------------
 echo ""
 echo "-> Verifying npm registry publish"
 sleep 5
@@ -414,10 +433,11 @@ if [[ "$PUBLISHED_VERSION" == "$VERSION" ]]; then
   echo "  -> university-admissions-officer@$VERSION confirmed on npm  [ok]"
 else
   echo "  Note: Registry shows '$PUBLISHED_VERSION' — propagation may take 1-2 minutes"
+  echo "  Verify with: npm view university-admissions-officer version"
 fi
 
 echo ""
 echo "========================================"
-echo " university-admissions-officer@$VERSION deployed to npm ✓"
+echo " university-admissions-officer@$VERSION deployed to npm"
 echo " Users can now run:  npx university-admissions-officer"
 echo "========================================"

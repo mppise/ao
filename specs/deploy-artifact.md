@@ -1,49 +1,50 @@
-# Deploy Artifact — Release 1.1.4
+# Deploy Artifact — Release 1.4.0
 **Date:** 2026-06-15  **Status:** ready
-**Target:** NPX local desktop app (Node.js + npm publish via `npx ao`)
+**Target:** npm registry (npx university-admissions-officer)
 
 ## Stories in this release
 
 | Story | Title | Language | Build command | Release type |
 |-------|-------|----------|---------------|--------------|
-| STORY-002 | Document upload and AI classification | node | node bin/cli.js | patch |
+| STORY-001 | Student signup and profile setup (enhanced: non-blocking .env initialization) | node | npm install | initial |
+| STORY-006 | Personal essay draft generation and editing | node | node bin/cli.js | initial |
 
 ## Deployment history
 
 | Story | Release | Date |
 |-------|---------|------|
 | STORY-001 | 1.0.0 | 2026-06-14 |
-| STORY-002 | 1.1.4 | 2026-06-15 |
 | STORY-003 | 1.1.3 | 2026-06-15 |
 | STORY-003a | 1.1.3 | 2026-06-15 |
 | STORY-004 | 1.1.3 | 2026-06-15 |
 | STORY-005 | 1.1.3 | 2026-06-15 |
-| STORY-006 | 1.1.3 | 2026-06-15 |
 | STORY-007 | 1.1.3 | 2026-06-15 |
+| STORY-002 | 1.1.4 | 2026-06-15 |
+| STORY-001 | 1.4.0 | 2026-06-15 |
+| STORY-006 | 1.4.0 | 2026-06-15 |
 
 ## Deployment order
-1. STORY-002 — Document upload and AI classification
-
-(STORY-001 already deployed at 1.0.0; STORY-002 dependency on STORY-001 is satisfied)
+1. STORY-001 — Student signup and profile setup (no dependencies)
+2. STORY-006 — Personal essay draft generation and editing (depends on STORY-004, STORY-003a — both previously deployed)
 
 ## Checks
 
 | Check | Result |
 |-------|--------|
-| Dependency order resolved | ✓ |
-| Runtime profiles read from build-report.yaml | ✓ |
-| build-report.yaml overall_status | ✓ pass |
-| Infrastructure target | NPX local desktop app (Node.js + npm publish) |
+| Dependency order resolved | pass |
+| Runtime profiles read from build-report.yaml | pass |
+| build-report.yaml overall_status (STORY-001) | pass |
+| build-report.yaml overall_status (STORY-006) | pass |
+| Infrastructure target | npm registry |
 | Version stamp method | npm version $VERSION --no-git-tag-version (package.json) |
-| deploy.sh syntax | ✓ |
-| deploy.sh permissions | ✓ executable |
+| deploy.sh syntax | pass |
+| deploy.sh permissions | pass — executable |
 
 ## Environment variables required
-- `NPM_TOKEN` — npm authentication token for registry publish (production only; dry-run does not require it)
+None beyond npm authentication token (prompted interactively at publish time).
+Dry-run does not require any environment variables.
 
 ## Manual steps required
-- Ensure npm authentication before publish: run `npm login` or export `NPM_TOKEN=<your-token>`
-- If this is a scoped package (`@scope/admissions-officer`), add `--access public` to the `npm publish` command
-- `DATA_DIR` in `.env` should point to the student's chosen directory on first run; `./data` at project root is a development default only and is not shipped via npm
+None — all steps are automated. The npm granular access token is prompted interactively at publish time with step-by-step instructions and browser auto-open to npmjs.com/settings.
 
 Script: `specs/deploy.sh`
