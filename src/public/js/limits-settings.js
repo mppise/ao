@@ -35,6 +35,12 @@ let _limitsHasUnsavedChanges = false;
  */
 let _limitsUnloadHandler = null;
 
+/**
+ * The original preset that was loaded (e.g. 'common_app').
+ * Used to show "based on Common App" badge when user edits within that tab.
+ */
+let _limitsOriginalPreset = null;
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
@@ -56,30 +62,25 @@ function _formatLimitsTimestamp(iso) {
 
 /**
  * Read current field values from the DOM as a limits object.
- * @returns {{ preset: string, limits: object }}
+ * @returns {{ limits: object }}
  */
 function _readLimitsFromDOM() {
-  const preset = document.querySelector('.btn-limits-preset.active')
-    ? document.querySelector('.btn-limits-preset.active').dataset.preset
-    : 'common_app';
-
-  return {
-    preset,
-    limits: {
-      impactStatements: {
-        min: parseInt(document.getElementById('limits-is-min').value, 10),
-        max: parseInt(document.getElementById('limits-is-max').value, 10),
-      },
-      essays: {
-        min: parseInt(document.getElementById('limits-essays-min').value, 10),
-        max: parseInt(document.getElementById('limits-essays-max').value, 10),
-      },
-      questionnaireFields: {
-        min: parseInt(document.getElementById('limits-qf-min').value, 10),
-        max: parseInt(document.getElementById('limits-qf-max').value, 10),
-      },
+  const limits = {
+    impactStatements: {
+      min: parseInt(document.getElementById('limits-is-min').value, 10),
+      max: parseInt(document.getElementById('limits-is-max').value, 10),
+    },
+    essays: {
+      min: parseInt(document.getElementById('limits-essays-min').value, 10),
+      max: parseInt(document.getElementById('limits-essays-max').value, 10),
+    },
+    questionnaireFields: {
+      min: parseInt(document.getElementById('limits-qf-min').value, 10),
+      max: parseInt(document.getElementById('limits-qf-max').value, 10),
     },
   };
+
+  return { limits };
 }
 
 /**
@@ -87,7 +88,6 @@ function _readLimitsFromDOM() {
  */
 function _limitsEqual(a, b) {
   if (!a || !b) return false;
-  if (a.preset !== b.preset) return false;
   const secs = ['impactStatements', 'essays', 'questionnaireFields'];
   for (const sec of secs) {
     if ((a.limits[sec].min) !== (b.limits[sec].min)) return false;
@@ -95,6 +95,7 @@ function _limitsEqual(a, b) {
   }
   return true;
 }
+
 
 /**
  * Fill field inputs with given limits values.
@@ -111,19 +112,14 @@ function _populateLimitsFields(limits) {
 
 /**
  * Apply readonly attribute state based on preset.
+ * All presets are now editable — this function ensures readonly is always removed.
  * @param {'common_app'|'coalition_app'|'custom'} preset
  */
 function _applyReadonlyState(preset) {
   const inputs = document.querySelectorAll('.limits-field-input');
-  const isReadonly = (preset === 'common_app' || preset === 'coalition_app');
   inputs.forEach(input => {
-    if (isReadonly) {
-      input.setAttribute('readonly', '');
-      input.classList.add('bg-light');
-    } else {
-      input.removeAttribute('readonly');
-      input.classList.remove('bg-light');
-    }
+    input.removeAttribute('readonly');
+    input.classList.remove('bg-light');
   });
 }
 
@@ -181,26 +177,6 @@ function _updateSaveButtonState() {
   saveBtn.disabled = !isDirty || !formValid;
 }
 
-/**
- * Switch active preset button and update fields + readonly state.
- * @param {string} preset
- * @param {object|null} customValues - if switching to custom, preserve shown values
- */
-function _switchPreset(preset, customValues) {
-  // Update button active state
-  document.querySelectorAll('.btn-limits-preset').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.preset === preset);
-  });
-
-  // Apply preset canonical values or keep custom values
-  if (preset === 'common_app' || preset === 'coalition_app') {
-    _populateLimitsFields(PRESET_DEFAULTS[preset]);
-  }
-  // For 'custom': retain currently shown values (don't overwrite)
-
-  _applyReadonlyState(preset);
-  _updateSaveButtonState();
-}
 
 // ─── Limits banner (used on impact statement and essay screens) ───────────────
 
@@ -225,13 +201,7 @@ async function renderLimitsBanner(containerId, type) {
     return; // Silent fail
   }
 
-  const preset = limitsData.preset;
   const limits = limitsData.limits;
-
-  let presetLabel;
-  if (preset === 'common_app') presetLabel = 'Common App';
-  else if (preset === 'coalition_app') presetLabel = 'Coalition App';
-  else presetLabel = 'your custom';
 
   let limitsLine;
   if (type === 'impact') {
@@ -251,7 +221,7 @@ async function renderLimitsBanner(containerId, type) {
   banner.innerHTML = `
     <i class="bi bi-info-circle-fill mt-1 flex-shrink-0"></i>
     <div class="flex-grow-1">
-      <strong>Generating within ${escapeHtml(presetLabel)} limits</strong><br>
+      <strong>Generating within your limits</strong><br>
       <span class="small">${escapeHtml(limitsLine)}</span>
     </div>
     <a href="/settings" class="btn btn-sm btn-outline-info ms-auto flex-shrink-0"
@@ -293,7 +263,6 @@ async function renderLimitsSettingsPanel() {
     loadError = true;
     limitsData = {
       source: 'defaults',
-      preset: 'common_app',
       lastUpdated: null,
       limits: {
         impactStatements: { min: 100, max: 1000 },
@@ -303,25 +272,7 @@ async function renderLimitsSettingsPanel() {
     };
   }
 
-  const { preset, lastUpdated, limits } = limitsData;
-
-  // Build preset buttons HTML
-  const presets = [
-    { id: 'common_app', label: 'Common App' },
-    { id: 'coalition_app', label: 'Coalition App' },
-    { id: 'custom', label: 'Custom' },
-  ];
-
-  const presetBtns = presets.map(p => `
-    <button type="button"
-      class="btn btn-outline-secondary btn-limits-preset${preset === p.id ? ' active' : ''}"
-      data-preset="${escapeHtml(p.id)}"
-    >${escapeHtml(p.label)}</button>
-  `).join('');
-
-  const isReadonly = (preset === 'common_app' || preset === 'coalition_app');
-  const roAttr = isReadonly ? 'readonly' : '';
-  const bgClass = isReadonly ? 'bg-light' : '';
+  const { lastUpdated, limits } = limitsData;
 
   const lastSavedHtml = lastUpdated
     ? `<span class="text-muted small" id="limits-last-saved">Last saved: ${escapeHtml(_formatLimitsTimestamp(lastUpdated))}</span>`
@@ -340,14 +291,9 @@ async function renderLimitsSettingsPanel() {
 
         <div id="limits-alert-zone" class="mb-3"></div>
 
-        <div class="mb-3">
-          <label class="form-label small text-muted">Select preset:</label><br>
-          <div class="btn-group" role="group" aria-label="College preset">
-            ${presetBtns}
-          </div>
-        </div>
-
-        <hr>
+        <p class="text-muted small mb-3">
+          Set global word/character limits applied to all AI generations.
+        </p>
 
         <p class="fw-semibold small mb-2">Current limits:</p>
 
@@ -360,20 +306,18 @@ async function renderLimitsSettingsPanel() {
             </div>
             <div class="col-auto">
               <input type="number" id="limits-is-min"
-                class="form-control form-control-sm limits-field-input ${bgClass}"
+                class="form-control form-control-sm limits-field-input"
                 value="${limits.impactStatements.min}"
-                min="0" max="9999" step="1" style="width:90px;"
-                ${roAttr}>
+                min="0" max="9999" step="1" style="width:90px;">
             </div>
             <div class="col-auto">
               <label for="limits-is-max" class="col-form-label col-form-label-sm">Max chars:</label>
             </div>
             <div class="col-auto">
               <input type="number" id="limits-is-max"
-                class="form-control form-control-sm limits-field-input ${bgClass}"
+                class="form-control form-control-sm limits-field-input"
                 value="${limits.impactStatements.max}"
-                min="1" max="9999" step="1" style="width:90px;"
-                ${roAttr}>
+                min="1" max="9999" step="1" style="width:90px;">
             </div>
           </div>
           <div id="limits-is-error" class="text-danger small mt-1 d-none"></div>
@@ -388,20 +332,18 @@ async function renderLimitsSettingsPanel() {
             </div>
             <div class="col-auto">
               <input type="number" id="limits-essays-min"
-                class="form-control form-control-sm limits-field-input ${bgClass}"
+                class="form-control form-control-sm limits-field-input"
                 value="${limits.essays.min}"
-                min="0" max="9999" step="1" style="width:90px;"
-                ${roAttr}>
+                min="0" max="9999" step="1" style="width:90px;">
             </div>
             <div class="col-auto">
               <label for="limits-essays-max" class="col-form-label col-form-label-sm">Max words:</label>
             </div>
             <div class="col-auto">
               <input type="number" id="limits-essays-max"
-                class="form-control form-control-sm limits-field-input ${bgClass}"
+                class="form-control form-control-sm limits-field-input"
                 value="${limits.essays.max}"
-                min="1" max="9999" step="1" style="width:90px;"
-                ${roAttr}>
+                min="1" max="9999" step="1" style="width:90px;">
             </div>
           </div>
           <div id="limits-essays-error" class="text-danger small mt-1 d-none"></div>
@@ -416,20 +358,18 @@ async function renderLimitsSettingsPanel() {
             </div>
             <div class="col-auto">
               <input type="number" id="limits-qf-min"
-                class="form-control form-control-sm limits-field-input ${bgClass}"
+                class="form-control form-control-sm limits-field-input"
                 value="${limits.questionnaireFields.min}"
-                min="0" max="9999" step="1" style="width:90px;"
-                ${roAttr}>
+                min="0" max="9999" step="1" style="width:90px;">
             </div>
             <div class="col-auto">
               <label for="limits-qf-max" class="col-form-label col-form-label-sm">Max chars:</label>
             </div>
             <div class="col-auto">
               <input type="number" id="limits-qf-max"
-                class="form-control form-control-sm limits-field-input ${bgClass}"
+                class="form-control form-control-sm limits-field-input"
                 value="${limits.questionnaireFields.max}"
-                min="1" max="9999" step="1" style="width:90px;"
-                ${roAttr}>
+                min="1" max="9999" step="1" style="width:90px;">
             </div>
           </div>
           <div id="limits-qf-error" class="text-danger small mt-1 d-none"></div>
@@ -447,7 +387,6 @@ async function renderLimitsSettingsPanel() {
 
   // Initialize baseline for dirty-check
   _limitsBaseline = {
-    preset,
     limits: {
       impactStatements: { min: limits.impactStatements.min, max: limits.impactStatements.max },
       essays: { min: limits.essays.min, max: limits.essays.max },
@@ -455,13 +394,6 @@ async function renderLimitsSettingsPanel() {
     },
   };
   _limitsHasUnsavedChanges = false;
-
-  // Wire preset buttons
-  document.querySelectorAll('.btn-limits-preset').forEach(btn => {
-    btn.addEventListener('click', () => {
-      _switchPreset(btn.dataset.preset, null);
-    });
-  });
 
   // Wire field input events for dirty-check and validation
   document.querySelectorAll('.limits-field-input').forEach(input => {
@@ -501,7 +433,6 @@ async function _handleSaveLimits() {
   // Update baseline to the saved values
   const saved = result.data;
   _limitsBaseline = {
-    preset: saved.preset,
     limits: {
       impactStatements: {
         min: saved.limits.impactStatements.min,

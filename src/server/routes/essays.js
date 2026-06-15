@@ -127,18 +127,78 @@ router.get('/provenance', (req, res) => {
   }
 
   // Read tests.json → test scores
+  // Supports merged schema: { sat: { score: { total } }, act: { score: { composite } }, ap: [], ib: [], other: [] }
+  // and init schema: { data: { sat, act, ap: [], ib: [], other: [] } }
   try {
-    const testsData = readJSON(path.join(profileDir, 'tests.json'));
-    const tests = testsData && testsData.data ? testsData.data : testsData;
-    const items = (tests && tests.items) ? tests.items : (Array.isArray(tests) ? tests : []);
-    if (items.length > 0) {
-      testScores = items.map(t => ({
-        id: t.id,
-        name: t.testName || t.name || 'Unknown test',
-        score: String(t.score || ''),
-        confidence: t.confidence != null ? t.confidence : null,
-        source: t.source || 'Manually added',
-      }));
+    const testsFile = readJSON(path.join(profileDir, 'tests.json'));
+    if (testsFile) {
+      // Normalise: prefer top-level merged schema, fall back to data wrapper
+      const tests = (testsFile.sat !== undefined || testsFile.act !== undefined ||
+                     testsFile.ap !== undefined || testsFile.ib !== undefined)
+        ? testsFile
+        : (testsFile.data || {});
+
+      const items = [];
+
+      // SAT — synthetic id 'sat'
+      if (tests.sat && tests.sat.score) {
+        const total = tests.sat.score.total != null
+          ? tests.sat.score.total
+          : (tests.sat.score.math != null && tests.sat.score.ebrw != null
+              ? tests.sat.score.math + tests.sat.score.ebrw
+              : null);
+        if (total != null) {
+          items.push({
+            id: 'sat',
+            name: 'SAT',
+            score: String(total),
+            confidence: tests.sat.confidence != null ? tests.sat.confidence : null,
+            source: tests.sat.source || 'Manually added',
+          });
+        }
+      } else if (tests.sat != null && typeof tests.sat !== 'object') {
+        items.push({ id: 'sat', name: 'SAT', score: String(tests.sat), confidence: null, source: 'Manually added' });
+      }
+
+      // ACT — synthetic id 'act'
+      if (tests.act && tests.act.score) {
+        const composite = tests.act.score.composite != null ? tests.act.score.composite : null;
+        if (composite != null) {
+          items.push({
+            id: 'act',
+            name: 'ACT',
+            score: String(composite),
+            confidence: tests.act.confidence != null ? tests.act.confidence : null,
+            source: tests.act.source || 'Manually added',
+          });
+        }
+      } else if (tests.act != null && typeof tests.act !== 'object') {
+        items.push({ id: 'act', name: 'ACT', score: String(tests.act), confidence: null, source: 'Manually added' });
+      }
+
+      // AP scores — synthetic id 'ap-<examName>'
+      if (Array.isArray(tests.ap)) {
+        tests.ap.forEach(a => items.push({
+          id: a.id || `ap-${a.examName || a.name || ''}`,
+          name: `AP ${a.examName || a.name || ''}`,
+          score: String(a.score || ''),
+          confidence: a.confidence != null ? a.confidence : null,
+          source: a.source || 'Manually added',
+        }));
+      }
+
+      // IB scores — synthetic id 'ib-<subject>'
+      if (Array.isArray(tests.ib)) {
+        tests.ib.forEach(a => items.push({
+          id: a.id || `ib-${a.subject || ''}`,
+          name: `IB ${a.subject || ''} (${a.level || ''})`,
+          score: String(a.score || ''),
+          confidence: a.confidence != null ? a.confidence : null,
+          source: a.source || 'Manually added',
+        }));
+      }
+
+      if (items.length > 0) testScores = items;
     }
   } catch (err) {
     if (err.code !== 'ENOENT') {
@@ -147,14 +207,29 @@ router.get('/provenance', (req, res) => {
   }
 
   // Read achievements.json + activities.json
+  // Supports merged schema: { achievements: [...] } / { activities: [...] }
+  // and init schema: { data: { items: [...] } }
   try {
     const achItems = [];
     for (const file of ['achievements.json', 'activities.json']) {
       try {
         const achData = readJSON(path.join(profileDir, file));
-        const ach = achData && achData.data ? achData.data : achData;
-        const items = (ach && ach.items) ? ach.items : (Array.isArray(ach) ? ach : []);
-        items.forEach(a => achItems.push({ ...a, _file: file }));
+        if (achData) {
+          let items = [];
+          if (file === 'achievements.json') {
+            // Merged schema
+            items = Array.isArray(achData.achievements) ? achData.achievements
+              // Init schema
+              : (achData.data && Array.isArray(achData.data.items)) ? achData.data.items
+              : [];
+          } else {
+            // activities.json
+            items = Array.isArray(achData.activities) ? achData.activities
+              : (achData.data && Array.isArray(achData.data.items)) ? achData.data.items
+              : [];
+          }
+          items.forEach(a => achItems.push({ ...a, _file: file }));
+        }
       } catch (err) {
         if (err.code !== 'ENOENT') {
           warnings.push(`Could not read ${file === 'achievements.json' ? 'achievements' : 'activities'} data.`);
@@ -164,10 +239,10 @@ router.get('/provenance', (req, res) => {
     if (achItems.length > 0) {
       achievements = achItems.map(a => ({
         id: a.id,
-        name: a.name || a.title || a.activityName || '(unnamed)',
+        name: a.awardName || a.activityName || a.title || a.name || '(unnamed)',
         category: a.category || (a._file === 'activities.json' ? 'Extracurricular Activity' : 'Award'),
         confidence: a.confidence != null ? a.confidence : null,
-        source: a.source || 'Manually added',
+        source: typeof a.source === 'object' ? (a.source.documentName || 'Extracted') : (a.source || 'Manually added'),
       }));
     }
   } catch (err) {
@@ -314,43 +389,64 @@ function _resolveProvenanceUsed(dataDir, sel) {
     } catch (_) { /* non-fatal */ }
   }
 
-  // Test scores
+  // Test scores — build same synthetic-ID items as provenance GET endpoint
   if (Array.isArray(sel.testScoreIds) && sel.testScoreIds.length > 0) {
     try {
-      const testsData = readJSON(path.join(profileDir, 'tests.json'));
-      const tests = testsData && testsData.data ? testsData.data : testsData;
-      const items = (tests && tests.items) ? tests.items : (Array.isArray(tests) ? tests : []);
-      result.testScores = items
-        .filter(t => sel.testScoreIds.includes(t.id))
-        .map(t => ({
-          id: t.id,
-          name: t.testName || t.name || 'Unknown test',
-          score: String(t.score || ''),
-          confidence: t.confidence != null ? t.confidence : null,
-          source: t.source || 'Manually added',
-        }));
+      const testsFile = readJSON(path.join(profileDir, 'tests.json'));
+      if (testsFile) {
+        const tests = (testsFile.sat !== undefined || testsFile.act !== undefined ||
+                       testsFile.ap !== undefined || testsFile.ib !== undefined)
+          ? testsFile
+          : (testsFile.data || {});
+
+        const items = [];
+        if (tests.sat && tests.sat.score) {
+          const total = tests.sat.score.total != null ? tests.sat.score.total
+            : (tests.sat.score.math != null && tests.sat.score.ebrw != null ? tests.sat.score.math + tests.sat.score.ebrw : null);
+          if (total != null) items.push({ id: 'sat', name: 'SAT', score: String(total), confidence: tests.sat.confidence || null, source: tests.sat.source || 'Manually added' });
+        } else if (tests.sat != null && typeof tests.sat !== 'object') {
+          items.push({ id: 'sat', name: 'SAT', score: String(tests.sat), confidence: null, source: 'Manually added' });
+        }
+        if (tests.act && tests.act.score && tests.act.score.composite != null) {
+          items.push({ id: 'act', name: 'ACT', score: String(tests.act.score.composite), confidence: tests.act.confidence || null, source: tests.act.source || 'Manually added' });
+        } else if (tests.act != null && typeof tests.act !== 'object') {
+          items.push({ id: 'act', name: 'ACT', score: String(tests.act), confidence: null, source: 'Manually added' });
+        }
+        if (Array.isArray(tests.ap)) tests.ap.forEach(a => items.push({ id: a.id || `ap-${a.examName || ''}`, name: `AP ${a.examName || ''}`, score: String(a.score || ''), confidence: a.confidence || null, source: a.source || 'Manually added' }));
+        if (Array.isArray(tests.ib)) tests.ib.forEach(a => items.push({ id: a.id || `ib-${a.subject || ''}`, name: `IB ${a.subject || ''}`, score: String(a.score || ''), confidence: a.confidence || null, source: a.source || 'Manually added' }));
+
+        result.testScores = items.filter(t => sel.testScoreIds.includes(t.id));
+      }
     } catch (_) { /* non-fatal */ }
   }
 
-  // Achievements
+  // Achievements — supports merged schema { achievements: [...] } / { activities: [...] }
   if (Array.isArray(sel.achievementIds) && sel.achievementIds.length > 0) {
     try {
       const achItems = [];
       for (const file of ['achievements.json', 'activities.json']) {
         try {
           const achData = readJSON(path.join(profileDir, file));
-          const ach = achData && achData.data ? achData.data : achData;
-          const items = (ach && ach.items) ? ach.items : (Array.isArray(ach) ? ach : []);
-          items.forEach(a => achItems.push({ ...a, _file: file }));
+          if (achData) {
+            let items = [];
+            if (file === 'achievements.json') {
+              items = Array.isArray(achData.achievements) ? achData.achievements
+                : (achData.data && Array.isArray(achData.data.items)) ? achData.data.items : [];
+            } else {
+              items = Array.isArray(achData.activities) ? achData.activities
+                : (achData.data && Array.isArray(achData.data.items)) ? achData.data.items : [];
+            }
+            items.forEach(a => achItems.push({ ...a, _file: file }));
+          }
         } catch (_) { /* non-fatal */ }
       }
       result.achievements = achItems
         .filter(a => sel.achievementIds.includes(a.id))
         .map(a => ({
           id: a.id,
-          name: a.name || a.title || a.activityName || '(unnamed)',
+          name: a.awardName || a.activityName || a.title || a.name || '(unnamed)',
           category: a.category || (a._file === 'activities.json' ? 'Extracurricular Activity' : 'Award'),
-          source: a.source || 'Manually added',
+          source: typeof a.source === 'object' ? (a.source.documentName || 'Extracted') : (a.source || 'Manually added'),
         }));
     } catch (_) { /* non-fatal */ }
   }

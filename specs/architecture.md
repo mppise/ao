@@ -264,3 +264,34 @@ This cross-cutting feature provides a unified guidance and transparency layer fo
 - Changes to backend extraction or confidence scoring logic
 - Deep AI reasoning explanations (kept simple and student-facing)
 - Full audit trails or versioning of profile data (comes in v1.2)
+
+## Amendment — 2026-06-15: Configurable Word Limits & College Guideline Presets
+
+### New Story Added
+**STORY-007: Configurable word limits & college guideline presets** (enhancement, no dependencies)
+
+### Rationale
+Current word limits are hardcoded across all users (impact statements: 1–1000 characters; essays: 500–650 words; questionnaire fields: 500 characters). Different colleges enforce different guidelines (Common App: 650-word essays, Coalition App: different essay formats; some schools require 100–250 word impact statements). This feature enables users to customize limits based on their target college's requirements.
+
+### Scope — What Gets Delivered
+- **Settings panel:** UI screen showing current word/character limits (impact statements, essays, questionnaire fields)
+- **Presets:** Three built-in presets — "Common App", "Coalition App", "Custom" — that auto-populate limits based on college guidelines
+- **Limit adjustment:** Users can manually tweak min/max for each limit type
+- **Display on generation screens:** Current limits shown on impact statement and essay generation screens before user initiates generation
+- **Persistence:** Settings saved to config file (`/src/config/limits.json` or similar), loaded on app startup; persists across sessions
+
+### Dependencies
+- **No dependencies:** This is an independent enhancement that does not block or require any existing story
+
+### Implementation Strategy
+1. **Frontend:** New "Settings" tab in main UI → collapsible "Word Limits" section with preset dropdown + editable fields
+2. **Backend:** New config endpoint `GET /api/config/limits` (read current limits) and `POST /api/config/limits` (save new limits)
+3. **Config storage:** `/src/config/limits.json` (default values + user overrides); load on server startup; no schema changes to profile data
+4. **Generation screens:** Before generating impact statement or essay, fetch current limits from config and display (e.g., "Generating essay up to 650 words based on Common App guidelines")
+5. **No business logic changes:** Limits are informational only in v1; AI generation respects limits but does not enforce them (user still edits and truncates if needed)
+
+### Non-Goals (v1)
+- Enforcement: Generated essays are not automatically truncated to limits
+- Per-college recommendation: AO does not recommend which college preset to use
+- Integration with Common App or Coalition APIs
+- Persistence across multiple user profiles (applies globally to current user only)

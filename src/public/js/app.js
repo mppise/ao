@@ -42,6 +42,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     handleHashRoute(window.location.hash);
   });
 
+  // Navbar: centralized upload button — always opens upload modal (no pre-selected section)
+  const navUploadBtn = document.getElementById('nav-btn-upload');
+  if (navUploadBtn) {
+    navUploadBtn.addEventListener('click', () => {
+      openUploadModal(null);
+    });
+  }
+
   // Check for hash route on initial load
   if (window.location.hash && window.location.hash.length > 1) {
     await router(window.location.pathname);
@@ -540,7 +548,7 @@ function showProfileExistsModal(existingProfile, dataDir) {
 
 async function showDashboard(studentData) {
   showNavbar();
-  history.pushState({}, '', '/');
+  history.replaceState({}, '', '/');
   document.title = 'Dashboard — Admissions Officer';
 
   // Show loading state
@@ -567,7 +575,7 @@ async function showDashboard(studentData) {
     return;
   }
 
-  const { sections, student, profileCompletionPercent } = result.data;
+  const { sections, student } = result.data;
   const firstName = (student && student.firstName) || (studentData && studentData.firstName) || 'there';
   const displayName = (student && student.displayName) || firstName;
 
@@ -576,19 +584,6 @@ async function showDashboard(studentData) {
   renderTemplate(`
     <div class="mb-4 d-flex justify-content-between align-items-center">
       <h2 class="h4 fw-semibold mb-0">Welcome, ${escapeHtml(firstName)}!</h2>
-    </div>
-
-    <div class="mb-4">
-      <div class="d-flex justify-content-between align-items-center mb-1">
-        <span class="fw-medium">Your Profile</span>
-        <span class="text-muted small">${profileCompletionPercent}% complete</span>
-      </div>
-      <div class="progress ao-progress">
-        <div class="progress-bar bg-primary" role="progressbar"
-          style="width: ${profileCompletionPercent}%"
-          aria-valuenow="${profileCompletionPercent}" aria-valuemin="0" aria-valuemax="100">
-        </div>
-      </div>
     </div>
 
     <div class="row row-cols-1 row-cols-sm-2 g-3 mb-4" id="sections-grid">
@@ -695,13 +690,6 @@ function renderSectionCard(key, label, icon, section) {
           <p class="ao-section-status mb-3">${escapeHtml(String(statusLabel))}</p>
           <div class="d-flex gap-2 justify-content-center flex-wrap" onclick="event.stopPropagation()">
             <button
-              class="btn btn-sm btn-outline-primary btn-upload"
-              data-section="${key}"
-              aria-label="Upload documents for ${label}"
-            >
-              <i class="bi bi-upload me-1"></i>Upload docs
-            </button>
-            <button
               class="btn btn-sm btn-outline-secondary btn-add-manual"
               data-section="${key}"
               aria-label="Add ${label} manually"
@@ -784,8 +772,8 @@ function renderGenerateCard(key, label, icon, section, sections) {
       statusLabel = `${count} statement${count !== 1 ? 's' : ''} saved${lastEdited ? `<br><span class="small text-muted">Last edited: ${escapeHtml(lastEdited)}</span>` : ''}`;
 
       const generateNewBtn = hasProfile
-        ? `<button class="btn btn-sm btn-primary btn-generate-essay" aria-label="Generate New Statement">
-            <i class="bi bi-stars me-1"></i>Generate New
+        ? `<button class="btn btn-sm btn-primary btn-generate-essay" aria-label="Generate essay">
+            <i class="bi bi-stars me-1"></i>Generate
           </button>`
         : `<button
             class="btn btn-sm btn-outline-secondary disabled"
@@ -795,7 +783,7 @@ function renderGenerateCard(key, label, icon, section, sections) {
             data-bs-placement="top"
             title="${escapeHtml(tooltipText)}"
           >
-            <i class="bi bi-stars me-1"></i>Generate New
+            <i class="bi bi-stars me-1"></i>Generate
           </button>`;
 
       return `
@@ -931,15 +919,6 @@ function wireUpSectionButtons(sections) {
         const sectionKey = link.dataset.sectionNav;
         appNavigate(`/section/${sectionKey}`);
       }
-    });
-  });
-
-  // Upload buttons — opens document upload modal
-  document.querySelectorAll('.btn-upload').forEach(btn => {
-    btn.addEventListener('click', e => {
-      e.stopPropagation();
-      const section = btn.dataset.section;
-      openUploadModal(section);
     });
   });
 
@@ -1455,7 +1434,13 @@ const SECTION_LABELS = {
 function openUploadModal(section, preloadResult = null) {
   _destroyUploadModal();
 
-  const sectionLabel = SECTION_LABELS[section] || capitalize(section);
+  // Build section selector HTML for Screen 1
+  const sectionKeys = ['academic', 'tests', 'achievements', 'activities'];
+  const sectionSelectorHtml = sectionKeys.map(key => {
+    const label = SECTION_LABELS[key];
+    const isActive = key === section;
+    return `<button type="button" class="btn btn-sm ${isActive ? 'btn-primary' : 'btn-outline-secondary'} upload-section-btn" data-section-key="${key}">${escapeHtml(label)}</button>`;
+  }).join('');
 
   const modalHtml = `
     <div class="modal fade" id="modal-upload-doc" tabindex="-1" aria-labelledby="uploadDocLabel" aria-modal="true">
@@ -1469,8 +1454,10 @@ function openUploadModal(section, preloadResult = null) {
             <!-- Screen 1: file picker -->
             <div id="upload-screen-1">
               <div class="mb-3">
-                <span class="text-muted small me-2">Section:</span>
-                <span class="badge bg-secondary" id="upload-section-badge">${escapeHtml(sectionLabel)}</span>
+                <p class="small text-muted mb-2">Which section does this document belong to?</p>
+                <div class="d-flex flex-wrap gap-2" id="upload-section-selector">
+                  ${sectionSelectorHtml}
+                </div>
               </div>
               <div id="upload-alert-zone"></div>
 
@@ -1481,12 +1468,12 @@ function openUploadModal(section, preloadResult = null) {
                 style="cursor:pointer;"
                 role="button"
                 tabindex="0"
-                aria-label="Click or drag to upload a file"
+                aria-label="Click or drag to upload a document"
               >
-                <i class="bi bi-cloud-upload fs-2 text-muted mb-2 d-block"></i>
-                <p class="mb-1">Drop PDF or image here</p>
+                <i class="bi bi-cloud-upload fs-1 text-primary mb-3 d-block"></i>
+                <p class="fw-medium mb-1">Drag &amp; drop your document here</p>
                 <p class="text-muted small mb-2">PDF, JPG, PNG, WEBP — max 20 MB</p>
-                <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-browse-files">Browse files</button>
+                <p class="text-muted small mb-0"><em>or click the <strong>Upload Document</strong> button below</em></p>
                 <input type="file" id="upload-file-input" accept=".pdf,.jpg,.jpeg,.png,.webp" class="d-none" aria-label="Select file">
               </div>
 
@@ -1507,12 +1494,18 @@ function openUploadModal(section, preloadResult = null) {
 
             <!-- Screen 2: processing spinner -->
             <div id="upload-screen-2" class="d-none text-center py-3">
-              <div class="spinner-border text-primary mb-3" role="status" style="width:3rem;height:3rem;">
-                <span class="visually-hidden">Analyzing...</span>
+              <div class="position-relative d-inline-block mb-3">
+                <div class="spinner-border text-primary" role="status" style="width:3.5rem;height:3.5rem;">
+                  <span class="visually-hidden">Analyzing...</span>
+                </div>
+                <i class="bi bi-cloud-upload text-primary position-absolute top-50 start-50 translate-middle" style="font-size:1.2rem;"></i>
               </div>
-              <p class="fw-medium mb-1">Analyzing your document...</p>
-              <p id="upload-processing-filename" class="text-muted small mb-2"></p>
-              <p class="text-muted small">This usually takes 5–15 seconds.</p>
+              <p class="fw-semibold mb-1">Uploading &amp; classifying your document...</p>
+              <p id="upload-processing-filename" class="text-primary small fw-medium mb-2"></p>
+              <div class="progress mb-3" style="height:4px;">
+                <div id="upload-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-primary" role="progressbar" style="width:100%"></div>
+              </div>
+              <p class="text-muted small">AI is reading your document. This usually takes 5–15 seconds.</p>
             </div>
 
             <!-- Screen 3: classification result -->
@@ -1522,21 +1515,24 @@ function openUploadModal(section, preloadResult = null) {
                 <i id="result-icon" class="bi bi-check-circle-fill text-success fs-1"></i>
               </div>
               <div id="result-high-conf">
-                <p class="mb-1">We found:</p>
-                <p id="result-type" class="h5 fw-bold mb-1"></p>
-                <p class="mb-2">
+                <p class="text-muted small mb-1">Detected document type:</p>
+                <p id="result-type" class="h4 fw-bold mb-2 text-dark"></p>
+                <div class="d-flex align-items-center gap-3 mb-2">
+                  <span class="badge bg-secondary fs-6 px-3 py-2" id="result-category-badge"></span>
+                  <span class="text-success fw-medium" id="result-confidence-text"></span>
+                </div>
+                <p class="text-muted small d-none">
                   <span class="text-muted">Category: </span>
                   <span id="result-category" class="text-muted"></span>
-                  &nbsp;&nbsp;
-                  <span id="result-confidence-text"></span>
                 </p>
               </div>
               <div id="result-low-conf" class="d-none">
-                <p class="mb-1 text-warning fw-medium">We're not sure what this document is.</p>
-                <p class="text-muted small mb-1">Best guess: <span id="result-guess"></span></p>
+                <p class="mb-1 text-warning fw-semibold">We're not sure what type this document is.</p>
+                <p class="text-muted small mb-1">Best guess: <span id="result-guess" class="fw-medium"></span></p>
               </div>
               <div id="result-unrecognized" class="d-none">
-                <p class="mb-1">We couldn't identify this document type. Please assign it to a section manually.</p>
+                <p class="mb-1 fw-medium">Document type could not be detected automatically.</p>
+                <p class="text-muted small">Please assign it to a section below so it can be saved.</p>
               </div>
 
               <!-- Preview box -->
@@ -1572,7 +1568,9 @@ function openUploadModal(section, preloadResult = null) {
             <!-- Screen 1 footer -->
             <div id="footer-screen-1" class="w-100 d-flex justify-content-between">
               <button type="button" class="btn btn-outline-secondary" id="btn-upload-cancel">Cancel</button>
-              <button type="button" class="btn btn-primary" id="btn-upload-submit" disabled>Upload</button>
+              <button type="button" class="btn btn-primary" id="btn-upload-submit">
+                <i class="bi bi-cloud-upload me-2"></i>Upload Document
+              </button>
             </div>
             <!-- Screen 2 footer (processing) -->
             <div id="footer-screen-2" class="w-100 d-none">
@@ -1599,7 +1597,27 @@ function openUploadModal(section, preloadResult = null) {
   let currentDocumentId = null;
   let currentClassification = null;
   let selectedCategory = null;
-  let sourceSection = section;
+  let sourceSection = section || null;
+
+  // ── Section selector wiring (Screen 1) ────────────────────────────────────
+
+  document.querySelectorAll('.upload-section-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      // Toggle active state
+      document.querySelectorAll('.upload-section-btn').forEach(b => {
+        b.classList.remove('btn-primary');
+        b.classList.add('btn-outline-secondary');
+      });
+      btn.classList.remove('btn-outline-secondary');
+      btn.classList.add('btn-primary');
+      sourceSection = btn.dataset.sectionKey;
+      // Clear section-related inline errors
+      const alertZone = document.getElementById('upload-alert-zone');
+      if (alertZone && alertZone.querySelector('.ao-section-error')) {
+        alertZone.querySelector('.ao-section-error').remove();
+      }
+    });
+  });
 
   // ── File input / drop zone wiring ──────────────────────────────────────────
 
@@ -1615,7 +1633,6 @@ function openUploadModal(section, preloadResult = null) {
     if (!ALLOWED_MIME_TYPES.includes(file.type) && !ALLOWED_EXTENSIONS.includes(ext)) {
       alertZone.innerHTML = `<div class="alert alert-danger small py-2">This file type is not supported. Please upload a PDF, JPG, PNG, or WEBP file.</div>`;
       selectedFile = null;
-      document.getElementById('btn-upload-submit').disabled = true;
       document.getElementById('upload-selected-file').classList.add('d-none');
       document.getElementById('upload-drop-zone').classList.remove('d-none');
       return;
@@ -1625,7 +1642,6 @@ function openUploadModal(section, preloadResult = null) {
     if (file.size > MAX_FILE_SIZE) {
       alertZone.innerHTML = `<div class="alert alert-danger small py-2">This file is too large (max 20 MB). Please compress or crop the document and try again.</div>`;
       selectedFile = null;
-      document.getElementById('btn-upload-submit').disabled = true;
       document.getElementById('upload-selected-file').classList.add('d-none');
       document.getElementById('upload-drop-zone').classList.remove('d-none');
       return;
@@ -1644,16 +1660,10 @@ function openUploadModal(section, preloadResult = null) {
     document.getElementById('upload-filesize').textContent = formatFileSize(file.size);
     document.getElementById('upload-drop-zone').classList.add('d-none');
     document.getElementById('upload-selected-file').classList.remove('d-none');
-    document.getElementById('btn-upload-submit').disabled = false;
   }
 
   dropZone.addEventListener('click', () => fileInput.click());
   dropZone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') fileInput.click(); });
-
-  document.getElementById('btn-browse-files').addEventListener('click', e => {
-    e.stopPropagation();
-    fileInput.click();
-  });
 
   fileInput.addEventListener('change', () => {
     if (fileInput.files && fileInput.files[0]) selectFile(fileInput.files[0]);
@@ -1678,7 +1688,6 @@ function openUploadModal(section, preloadResult = null) {
     fileInput.value = '';
     document.getElementById('upload-drop-zone').classList.remove('d-none');
     document.getElementById('upload-selected-file').classList.add('d-none');
-    document.getElementById('btn-upload-submit').disabled = true;
     document.getElementById('upload-alert-zone').innerHTML = '';
   });
 
@@ -1686,7 +1695,22 @@ function openUploadModal(section, preloadResult = null) {
 
   document.getElementById('btn-upload-submit').addEventListener('click', async () => {
     if (!selectedFile) {
-      document.getElementById('upload-alert-zone').innerHTML = `<div class="alert alert-danger small py-2">Please select a file before uploading.</div>`;
+      // No file yet — open the file picker directly (single-button flow)
+      fileInput.click();
+      return;
+    }
+
+    // Validate that a section has been selected
+    if (!sourceSection) {
+      const alertZone = document.getElementById('upload-alert-zone');
+      // Remove previous section error if any
+      const existing = alertZone.querySelector('.ao-section-error');
+      if (existing) existing.remove();
+      const errDiv = document.createElement('div');
+      errDiv.className = 'alert alert-danger small py-2 ao-section-error';
+      errDiv.textContent = 'Please select a section before uploading.';
+      alertZone.appendChild(errDiv);
+      document.getElementById('upload-section-selector').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       return;
     }
 
@@ -1750,6 +1774,10 @@ function openUploadModal(section, preloadResult = null) {
     document.getElementById('upload-screen-3').classList.remove('d-none');
     document.getElementById('footer-screen-3').classList.remove('d-none');
 
+    // Update modal title to reflect classified state
+    const modalTitle = document.getElementById('uploadDocLabel');
+    if (modalTitle) modalTitle.textContent = 'Document Classified';
+
     // Recommendation banner (AC-5, AC-16, AC-17)
     const resultAlertZone = document.getElementById('upload-result-alert-zone');
     if (resultAlertZone && cls.recommendation) {
@@ -1781,6 +1809,8 @@ function openUploadModal(section, preloadResult = null) {
       document.getElementById('result-high-conf').classList.remove('d-none');
       document.getElementById('result-type').textContent = cls.type;
       document.getElementById('result-category').textContent = cls.category;
+      const categoryBadge = document.getElementById('result-category-badge');
+      if (categoryBadge) categoryBadge.textContent = cls.category;
       document.getElementById('result-confidence-text').textContent = `${confidence}% confident`;
     }
 
@@ -1874,12 +1904,14 @@ function openUploadModal(section, preloadResult = null) {
       document.getElementById('footer-screen-3').classList.add('d-none');
       document.getElementById('upload-screen-1').classList.remove('d-none');
       document.getElementById('footer-screen-1').classList.remove('d-none');
+      // Reset modal title
+      const titleEl = document.getElementById('uploadDocLabel');
+      if (titleEl) titleEl.textContent = 'Upload a Document';
       // Clear file
       selectedFile = null;
       fileInput.value = '';
       document.getElementById('upload-drop-zone').classList.remove('d-none');
       document.getElementById('upload-selected-file').classList.add('d-none');
-      document.getElementById('btn-upload-submit').disabled = true;
       document.getElementById('upload-alert-zone').innerHTML = '';
       document.getElementById('result-alerts-zone') && (document.getElementById('result-alerts-zone').innerHTML = '');
     });
@@ -4167,11 +4199,9 @@ async function showImpactGenerator(achievement, answersArg) {
     </div>
   `);
 
-  document.getElementById('btn-back-to-dashboard').addEventListener('click', async e => {
+  document.getElementById('btn-back-to-dashboard').addEventListener('click', (e) => {
     e.preventDefault();
-    const statusResult = await getOnboardingStatus();
-    const student = statusResult.success && statusResult.data && statusResult.data.student ? statusResult.data.student : {};
-    showDashboard(student);
+    appNavigate('/');
   });
 
   // Character counter
@@ -4494,7 +4524,7 @@ function truncateStatementPreview(text) {
  */
 async function showImpactStatementsList() {
   showNavbar();
-  history.pushState({}, '', '/impact-statements');
+  history.replaceState({}, '', '/impact-statements');
   document.title = 'Impact Statements — Admissions Officer';
 
   renderTemplate(`
@@ -4521,15 +4551,9 @@ async function showImpactStatementsList() {
     </div>
   `);
 
-  document.getElementById('btn-back-to-dashboard-from-impact').addEventListener('click', async e => {
+  document.getElementById('btn-back-to-dashboard-from-impact').addEventListener('click', (e) => {
     e.preventDefault();
-    if (history.length > 1) {
-      history.back();
-    } else {
-      const statusResult = await getOnboardingStatus();
-      const student = statusResult.success && statusResult.data && statusResult.data.student ? statusResult.data.student : {};
-      showDashboard(student);
-    }
+    appNavigate('/');
   });
 
   document.getElementById('btn-generate-new-impact').addEventListener('click', openImpactPickerModal);
@@ -5354,7 +5378,7 @@ function showEssayEditScreen(draft, isNew) {
  */
 async function showEssaysList() {
   showNavbar();
-  history.pushState({}, '', '/essays');
+  history.replaceState({}, '', '/essays');
   document.title = 'Personal Statements — Admissions Officer';
 
   // Load sections to check if generate is available
@@ -5366,7 +5390,7 @@ async function showEssaysList() {
 
   const genBtnHtml = hasProfile
     ? `<button class="btn btn-sm btn-primary" id="btn-generate-new-from-list">
-        <i class="bi bi-stars me-1"></i>Generate New Statement
+        <i class="bi bi-stars me-1"></i>Generate
       </button>`
     : `<button
         class="btn btn-sm btn-outline-secondary disabled"
@@ -5377,7 +5401,7 @@ async function showEssaysList() {
         title="Add at least one achievement or activity first"
         id="btn-generate-new-from-list"
       >
-        <i class="bi bi-stars me-1"></i>Generate New Statement
+        <i class="bi bi-stars me-1"></i>Generate
       </button>`;
 
   renderTemplate(`
@@ -5444,7 +5468,7 @@ async function showEssaysList() {
     listContent.innerHTML = `
       <div class="text-center py-5">
         <p class="text-muted mb-3">No statements saved yet.</p>
-        <p class="text-muted small">Click <strong>Generate New Statement</strong> to create your first draft.</p>
+        <p class="text-muted small">Click <strong>Generate</strong> to create your first draft.</p>
       </div>`;
     return;
   }
@@ -5646,7 +5670,7 @@ function _essayConfirmModal(message, subMessage, confirmLabel, cancelLabel) {
  * Accessible via gear icon in navbar. URL: /settings.
  */
 async function showSettings() {
-  history.pushState({}, '', '/settings');
+  history.replaceState({}, '', '/settings');
   document.title = 'Settings — Admissions Officer';
 
   // Show loading state
@@ -5932,7 +5956,7 @@ async function showSectionPlaceholder(sectionName, student) {
     await showActivitiesDetail();
   } else {
     // Unknown section — show generic placeholder
-    history.pushState({}, '', `/section/${sectionName}`);
+    history.replaceState({}, '', `/section/${sectionName}`);
     document.title = `${capitalize(sectionName)} — Admissions Officer`;
     renderTemplate(`
       <div class="mb-3">
@@ -5950,7 +5974,7 @@ async function showSectionPlaceholder(sectionName, student) {
 // ─── Section Detail: Academic ─────────────────────────────────────────────────
 
 async function showAcademicDetail() {
-  history.pushState({}, '', '/section/academic');
+  history.replaceState({}, '', '/section/academic');
   document.title = 'Academic — Admissions Officer';
 
   renderTemplate(`
@@ -6050,12 +6074,30 @@ async function showAcademicDetail() {
  * @returns {string} HTML badge
  */
 function _buildSourceBadge(source) {
-  if (!source || typeof source !== 'object' || source.type === 'manual') {
+  // Handle null/undefined — default to manually added
+  if (!source) {
     return `<span class="badge bg-light text-muted border" title="Manually added">Manually added</span>`;
   }
+  // Handle legacy string source (e.g. "transcript-final.pdf" stored directly)
+  if (typeof source === 'string') {
+    if (source.trim()) {
+      return `<span class="badge bg-info text-dark" title="Extracted from ${escapeHtml(source)}">From ${escapeHtml(source)}</span>`;
+    }
+    return `<span class="badge bg-light text-muted border" title="Manually added">Manually added</span>`;
+  }
+  // Handle proper source object with type === 'manual'
+  if (source.type === 'manual') {
+    return `<span class="badge bg-light text-muted border" title="Manually added">Manually added</span>`;
+  }
+  // Handle extracted source with documentName
   if (source.type === 'extracted' && source.documentName) {
     return `<span class="badge bg-info text-dark" title="Extracted from ${escapeHtml(source.documentName)}">From ${escapeHtml(source.documentName)}</span>`;
   }
+  // Fallback: extracted but documentName missing — show generic extracted badge
+  if (source.type === 'extracted') {
+    return `<span class="badge bg-info text-dark" title="Extracted from document">From document</span>`;
+  }
+  // Default fallback
   return `<span class="badge bg-light text-muted border" title="Manually added">Manually added</span>`;
 }
 
@@ -6971,7 +7013,7 @@ function openAddExamScoreModal(existingCourses, onSuccess) {
 // ─── Section Detail: Tests ────────────────────────────────────────────────────
 
 async function showTestsDetail() {
-  history.pushState({}, '', '/section/tests');
+  history.replaceState({}, '', '/section/tests');
   document.title = 'Tests — Admissions Officer';
 
   renderTemplate(`
@@ -7023,6 +7065,7 @@ async function showTestsDetail() {
     const total = sat.score && sat.score.total !== undefined ? sat.score.total : (sat.score && typeof sat.score === 'number' ? sat.score : (sat.totalScore !== undefined ? sat.totalScore : null));
     const dateTaken = sat.testDate || sat.dateTaken || null;
 
+    const satSourceBadge = _buildSourceBadge(sat.source);
     html += `
       <div class="card shadow-sm mb-4">
         <div class="card-header d-flex align-items-center gap-2">
@@ -7036,6 +7079,7 @@ async function showTestsDetail() {
             ${total !== null ? `<div class="col-sm-4"><p class="text-muted small mb-1">Total</p><p class="fw-bold mb-0">${escapeHtml(String(total))}</p></div>` : ''}
             ${dateTaken ? `<div class="col-sm-4"><p class="text-muted small mb-1">Date</p><p class="mb-0">${escapeHtml(dateTaken)}</p></div>` : ''}
           </div>
+          <div class="mt-3">${satSourceBadge}</div>
         </div>
       </div>`;
   }
@@ -7046,6 +7090,7 @@ async function showTestsDetail() {
     const composite = act.score && act.score.composite !== undefined ? act.score.composite : (act.score && typeof act.score === 'number' ? act.score : (act.compositeScore !== undefined ? act.compositeScore : null));
     const dateTaken = act.testDate || act.dateTaken || null;
 
+    const actSourceBadge = _buildSourceBadge(act.source);
     html += `
       <div class="card shadow-sm mb-4">
         <div class="card-header d-flex align-items-center gap-2">
@@ -7057,6 +7102,7 @@ async function showTestsDetail() {
             ${composite !== null ? `<div class="col-sm-4"><p class="text-muted small mb-1">Composite</p><p class="fw-bold mb-0">${escapeHtml(String(composite))}</p></div>` : ''}
             ${dateTaken ? `<div class="col-sm-4"><p class="text-muted small mb-1">Date</p><p class="mb-0">${escapeHtml(dateTaken)}</p></div>` : ''}
           </div>
+          <div class="mt-3">${actSourceBadge}</div>
         </div>
       </div>`;
   }
@@ -7124,7 +7170,7 @@ async function showTestsDetail() {
 // ─── Section Detail: Achievements ────────────────────────────────────────────
 
 async function showAchievementsDetail() {
-  history.pushState({}, '', '/section/achievements');
+  history.replaceState({}, '', '/section/achievements');
   document.title = 'Achievements — Admissions Officer';
 
   renderTemplate(`
@@ -7546,7 +7592,7 @@ function openDeleteAchievementModal(id, title) {
 // ─── Section Detail: Activities ───────────────────────────────────────────────
 
 async function showActivitiesDetail() {
-  history.pushState({}, '', '/section/activities');
+  history.replaceState({}, '', '/section/activities');
   document.title = 'Activities — Admissions Officer';
 
   renderTemplate(`

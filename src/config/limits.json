@@ -1,22 +1,22 @@
 {
   "schemaVersion": "1.0.0",
-  "preset": "common_app",
-  "lastUpdated": "2026-06-15T11:37:27.743Z",
+  "preset": "custom",
+  "lastUpdated": "2026-06-15T12:22:12.033Z",
   "limits": {
     "impactStatements": {
       "unit": "characters",
       "min": 100,
-      "max": 1000
+      "max": 150
     },
     "essays": {
       "unit": "words",
-      "min": 500,
-      "max": 650
+      "min": 200,
+      "max": 250
     },
     "questionnaireFields": {
       "unit": "characters",
-      "min": 100,
-      "max": 500
+      "min": 50,
+      "max": 100
     }
   }
 }

@@ -798,6 +798,13 @@ Field notes:
 - `dateTaken`: string in "YYYY-MM" format or null. Derived from MM/YYYY user input. Must be in the past.
 - `confidence`, `source`, `excerpt`, `confirmedByStudent`: same semantics as achievements items.
 
+**Dual-storage reality (implemented):** AP/IB exam scores are stored in two locations depending on how they were added:
+
+1. **`academic.json` → top-level `apIbScores[]` array** — written by the existing `POST /api/profile/academic/add-exam-score` endpoint (the manual-entry path from the Tests modal). Each item has an `id` field.
+2. **`tests.json` → `data.ap[]` / `data.ib[]` arrays** — written by `profile-merge.js` (STORY-003 extraction path). Each item also has an `id` field.
+
+Both locations are valid and may contain scores simultaneously. All CRUD endpoints for AP/IB scores (`GET /api/profile/academic/exam-scores`, `PUT /api/profile/academic/exam-score/:id`, `DELETE /api/profile/academic/exam-score/:id`) search both storage locations. `PUT` and `DELETE` try `academic.json.apIbScores[]` first, then fall back to `tests.json.data.ap[]`/`tests.json.data.ib[]`. STORY-005 (export) must also read from both locations to get the complete AP/IB score list.
+
 #### `DATA_DIR/profile/achievements.json`
 
 ```json
@@ -1114,6 +1121,15 @@ Returns current state of all 6 profile sections. Called when the Profile Dashboa
 ```
 
 `profileCompletionPercent`: integer 0–100. On STORY-001 it is always 0. Computed in later stories as sections gain data.
+
+**Dual-schema detection (implemented):** The reader functions `readSectionAcademic()`, `readSectionTests()`, and `readSectionItems()` in `profile.js` handle two coexisting data layouts in the same JSON files:
+
+- **Manual-entry schema** (written by `POST /api/profile/academic/add` and similar endpoints): data is nested under the `data:` envelope — e.g., `file.data.gpa`, `file.data.school`, `file.data.ap[]`.
+- **Extraction schema** (written by `profile-merge.js` from STORY-003): data is written at the top level of the JSON file — e.g., `file.gpa`, `file.schoolName`, `file.courses`, `file.achievements[]`, `file.activities[]`.
+
+Both schemas may coexist in the same file. `readSectionAcademic()` and `readSectionTests()` check the top-level fields first; if found, they build human-readable summary strings via `buildAcademicSummary()` and `buildTestsSummary()` helpers. `readSectionItems()` checks both `file.data.items[]` and top-level arrays. The `summary` field in the response is always a plain string (or null) — never an object — because `app.js` applies `escapeHtml(String(statusLabel))` to prevent `[object Object]` display.
+
+Any future story that reads academic, tests, achievements, or activities data from these JSON files must handle both the `file.data.*` envelope and the top-level `file.*` fields.
 
 **Error responses:**
 
@@ -1479,7 +1495,7 @@ Removes a single achievement by ID.
 
 #### `GET /api/profile/academic/exam-scores` (List)
 
-Returns all AP and IB exam scores.
+Returns all AP and IB exam scores, merged from both storage locations.
 
 **Request:** none
 
@@ -1505,11 +1521,13 @@ Returns all AP and IB exam scores.
 }
 ```
 
+**Implementation note:** The response merges scores from two sources into unified `ap` and `ib` arrays: `academic.json.apIbScores[]` (manual-entry path) and `tests.json.data.ap[]`/`tests.json.data.ib[]` (extraction path). Items from both sources are included. The Academic detail page uses this endpoint — not the section data from `GET /api/profile/sections` — to obtain IDs needed for Edit/Delete buttons.
+
 **Error responses:**
 
 | Status | `error.code` | Condition |
 |--------|-------------|-----------|
-| 500 | `READ_ERROR` | Failed to read tests.json |
+| 500 | `READ_ERROR` | Failed to read academic.json or tests.json |
 
 ---
 
@@ -1554,10 +1572,10 @@ Updates a single AP or IB exam score by ID.
 |--------|-------------|-----------|
 | 400 | `VALIDATION_ERROR` | Any field fails validation |
 | 400 | `SCORE_OUT_OF_RANGE` | Score outside allowed range for examType |
-| 404 | `NOT_FOUND` | No exam score with that `id` in ap or ib arrays |
-| 500 | `WRITE_ERROR` | Failed to write tests.json |
+| 404 | `NOT_FOUND` | No exam score with that `id` found in academic.json.apIbScores[], tests.json.data.ap[], or tests.json.data.ib[] |
+| 500 | `WRITE_ERROR` | Failed to write academic.json or tests.json |
 
-**Side effects:** Finds the score object in tests.json `ap` or `ib` array by id and updates in-place. If `examType` changes (e.g., AP → IB), moves the item from the `ap` array to the `ib` array. Writes audit entry `EXAM_SCORE_EDITED`.
+**Side effects:** Searches for the score by `id` in `academic.json.apIbScores[]` first; if not found, searches `tests.json.data.ap[]` then `tests.json.data.ib[]`. Updates the item in-place in whichever file it is found. If `examType` changes (e.g., AP → IB) and the item is in `tests.json`, moves it from the `ap` array to the `ib` array within that file. Writes audit entry `EXAM_SCORE_EDITED`.
 
 ---
 
@@ -1587,7 +1605,7 @@ Removes a single AP or IB exam score by ID.
 | 404 | `NOT_FOUND` | No exam score with that `id` exists |
 | 500 | `WRITE_ERROR` | Failed to write tests.json |
 
-**Side effects:** Removes item from the appropriate (`ap` or `ib`) array in tests.json. Writes audit entry `EXAM_SCORE_DELETED`.
+**Side effects:** Searches for the score by `id` in `academic.json.apIbScores[]` first; if not found, searches `tests.json.data.ap[]` then `tests.json.data.ib[]`. Removes the item from whichever file and array it is found in. Writes audit entry `EXAM_SCORE_DELETED`.
 
 ---
 
@@ -1984,3 +2002,5 @@ Dashboard state: fetched fresh from `GET /api/profile/sections` on each load. No
 | 1.0.0 | 2026-06-14 | Initial spec authored | feature |
 | 1.0.0 | 2026-06-14 | Bug-fix pass: SPA routing with browser history support; home link on app name; Settings screen (PORT/DATA_DIR/GEMINI_MODEL/GEMINI_API_KEY/export config); export page boundary note (STORY-005); View All / View Details buttons on non-empty section cards; 12 new acceptance criteria | fix |
 | 1.1.2 | 2026-06-14 | Bug-fix pass: full CRUD (edit + delete) for Activities, Achievements, and AP/IB Exam Scores. Added Screens 7/8/9, edit/delete modals with pre-population and inline validation, 6 new API endpoints (PUT/DELETE for activities, achievements, exam-score), tests.json schema extended with per-item id and ib array, activities/achievements item schemas extended with startDate/endDate/description/category fields, 15 new acceptance criteria (31–45), enterprise checks updated for edit/delete error states and data safety, api-client.js updated with 8 new functions. | fix |
+| 1.1.2 | 2026-06-15 | Gap merged: GET /api/profile/sections now handles dual schema — manual-entry data nested under file.data.* and extraction data at top level file.* (written by profile-merge.js). Added dual-schema detection note to Data and backend section and GET /api/profile/sections endpoint. Summary field is always a plain string. | gap-merge |
+| 1.1.2 | 2026-06-15 | Gap merged: AP/IB exam scores stored in two locations — academic.json.apIbScores[] (manual entry via add-exam-score endpoint) and tests.json.data.ap[]/ib[] (STORY-003 extraction). All CRUD endpoints search both locations; GET merges both into unified response. Updated tests.json schema, GET/PUT/DELETE exam-score endpoint docs, and error tables to reflect dual-storage reality. | gap-merge |

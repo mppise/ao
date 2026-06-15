@@ -1,45 +1,49 @@
-# Deploy Artifact — Release 1.1.2
-**Date:** 2026-06-14  **Status:** ready
-**Target:** NPX local desktop app (npm registry — `npx ao`)
+# Deploy Artifact — Release 1.1.4
+**Date:** 2026-06-15  **Status:** ready
+**Target:** NPX local desktop app (Node.js + npm publish via `npx ao`)
 
 ## Stories in this release
 
 | Story | Title | Language | Build command | Release type |
 |-------|-------|----------|---------------|--------------|
-| STORY-003 | Data extraction and confidence-scored review | node | npm start | patch |
+| STORY-002 | Document upload and AI classification | node | node bin/cli.js | patch |
 
 ## Deployment history
 
 | Story | Release | Date |
 |-------|---------|------|
-| STORY-001 | 1.1.0 | 2026-06-14 |
-| STORY-002 | 1.1.0 | 2026-06-14 |
-| STORY-003 | 1.1.2 | 2026-06-14 |
-| STORY-004 | 1.1.0 | 2026-06-14 |
-| STORY-005 | 1.1.1 | 2026-06-14 |
-| STORY-006 | 1.1.0 | 2026-06-14 |
+| STORY-001 | 1.0.0 | 2026-06-14 |
+| STORY-002 | 1.1.4 | 2026-06-15 |
+| STORY-003 | 1.1.3 | 2026-06-15 |
+| STORY-003a | 1.1.3 | 2026-06-15 |
+| STORY-004 | 1.1.3 | 2026-06-15 |
+| STORY-005 | 1.1.3 | 2026-06-15 |
+| STORY-006 | 1.1.3 | 2026-06-15 |
+| STORY-007 | 1.1.3 | 2026-06-15 |
 
 ## Deployment order
-1. STORY-003 — Data extraction and confidence-scored review (patch)
+1. STORY-002 — Document upload and AI classification
+
+(STORY-001 already deployed at 1.0.0; STORY-002 dependency on STORY-001 is satisfied)
 
 ## Checks
 
 | Check | Result |
 |-------|--------|
-| Dependency order resolved | ok |
-| Runtime profiles read from build-report.yaml | ok |
-| Infrastructure target | NPX / npm publish |
-| Version stamp method | npm version --no-git-tag-version |
-| deploy.sh syntax | ok |
-| deploy.sh permissions | ok executable |
+| Dependency order resolved | ✓ |
+| Runtime profiles read from build-report.yaml | ✓ |
+| build-report.yaml overall_status | ✓ pass |
+| Infrastructure target | NPX local desktop app (Node.js + npm publish) |
+| Version stamp method | npm version $VERSION --no-git-tag-version (package.json) |
+| deploy.sh syntax | ✓ |
+| deploy.sh permissions | ✓ executable |
 
 ## Environment variables required
-NPM_TOKEN — npm registry authentication token (production publish only)
+- `NPM_TOKEN` — npm authentication token for registry publish (production only; dry-run does not require it)
 
 ## Manual steps required
-- Set NPM_TOKEN in environment or run `npm login` before production publish
-- DATA_DIR in .env must point to user's chosen data directory before `npx ao` first run
-- If package name is scoped (@scope/admissions-officer), add --access public to npm publish
-- Verify coursesMergeMode dialog appears when re-uploading a transcript with duplicate courses
+- Ensure npm authentication before publish: run `npm login` or export `NPM_TOKEN=<your-token>`
+- If this is a scoped package (`@scope/admissions-officer`), add `--access public` to the `npm publish` command
+- `DATA_DIR` in `.env` should point to the student's chosen directory on first run; `./data` at project root is a development default only and is not shipped via npm
 
 Script: `specs/deploy.sh`

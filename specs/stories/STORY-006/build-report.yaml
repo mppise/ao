@@ -1,9 +1,9 @@
 story_id: STORY-006
 runtime:
   language: node
-  language_version: ">=18"
+  language_version: ">=18.0.0"
   package_manager: npm
-  build_command: "npm start"
+  build_command: "node bin/cli.js"
   build_output_dir: "src/"
   has_dockerfile: false
   has_migrations: false
@@ -11,13 +11,21 @@ runtime:
 files_modified:
   - src/ai/essay.js
   - src/server/routes/essays.js
-  - src/server/index.js
-  - src/public/js/api-client.js
   - src/public/js/app.js
-  - src/server/routes/profile.js
-commits: []
+  - src/public/js/api-client.js
+  - specs/project-state.yaml
+commits:
+  - "feat(STORY-006): personal essay draft generation and editing"
+  - "fix(STORY-006): enrich Gemini prompt with full profile — courses, test scores, achievements, activities, impact statements"
+gap_specs:
+  - gap.md
 warnings:
-  - "essays tile `lastEdited` field added to readSectionDrafts in profile.js to support the dashboard populated state display"
-  - "impact_statements linkage to achievements uses substring matching since achievement IDs in impact_statements.json may differ from achievement item IDs"
-  - "bug-fix pass: renamed all UI labels from 'Essays/Essay' to 'Personal Statements/Statement'; added SPA routes for /essays, /essays/generate, /essays/:id/edit; dashboard card-as-link pattern; navigate to /essays after save; localStorage unsaved-changes restore; preview+wordcount on list cards"
+  - "assembleProfileData() reads academic.json twice (once for GPA, once for courses); intentionally kept to minimize change surface"
+  - "readSectionDrafts() in profile.js counts all drafts (status=draft and status=saved) for the dashboard tile count; spec example shows saved counts but does not explicitly restrict to saved-only; kept existing behavior"
+  - "GET /api/essays/:id was missing from the essays router; added in this build pass"
+  - "provenanceSelection was not being passed to generateEssayDraft(); fixed so AI uses only student-selected items"
+  - "Dashboard [Generate Essay] and Essays list [Generate New] buttons were navigating directly to /essays/generate instead of opening the provenance modal; fixed to call openEssayProvenanceModal()"
+  - "[Regenerate] on Screen 3 was calling showEssayGenerating() which fired generation directly; fixed to call openEssayProvenanceModal() per AC#30"
+  - "Enhancement gap 2026-06-15: assembleProfileData was only reading GPA from academic.json (missing courses) and using wrong schema paths for tests, achievements, activities. All four sections now correctly resolved from both merged (top-level) and init (data-wrapped) schemas."
+  - "Test score IDs in provenance GET and _resolveProvenanceUsed were using items schema that doesn't exist in merged tests.json; replaced with synthetic IDs matching assembleProfileData (sat, act, ap-<name>, ib-<subject>)."
 overall_status: pass

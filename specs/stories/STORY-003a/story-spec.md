@@ -152,7 +152,7 @@ Each textarea:
 
 **Profile section blocks (one Bootstrap `card` per section with available data):**
 
-**Block 1 — GPA (shown only if `academic.json` has a gpa field):**
+**Block 1 — GPA (shown only if `academic.json` has a gpa field in either the rich nested schema (`academicData.gpa.overall.value`) or the flat schema (`gpa`)):**
 - Card header: "GPA" with `bi-mortarboard` icon
 - Body: single row showing:
   - GPA value (e.g., "3.9")
@@ -450,7 +450,10 @@ Already specced in STORY-004. This story adds no new parameters. The endpoint is
 **Request:** No body, no query params.
 
 **Server behaviour:**
-1. Read `academic.json` → extract `gpa`, `confidence`, `source` (source document filename).
+1. Read `academic.json` → extract GPA value, confidence, and source document filename. `academic.json` may use either of two schemas produced by STORY-003's extraction pipeline:
+   - **Rich nested schema (priority):** `academicData.gpa.overall.value`, `academicData.gpa.overall.confidence`, `academicData.gpa.overall.source`
+   - **Flat schema (fallback):** `gpa`, `confidence`, `source` at the root level
+   The `_resolveProvenanceUsed` helper and the provenance GET endpoint both check for the nested schema first; if `academicData.gpa.overall` is absent, they fall back to the flat schema. If neither is present, `data.gpa` is `null`.
 2. Read `tests.json` → extract each test entry: `id`, `name`, `score`, `confidence`, `source`.
 3. Read `achievements.json` → extract each entry: `id`, `name`, `category`, `confidence` (may be absent for manually entered achievements — set to `null`), `source` (document filename or `"Manually added"` if no source).
 4. Read `impact_statements.json` → extract each statement: `id`, `linkedAchievementName`, `statement` (for preview — truncated to 80 chars server-side), `aiGenerated`.
@@ -505,7 +508,7 @@ Already specced in STORY-004. This story adds no new parameters. The endpoint is
 }
 ```
 
-**Null sections:** If `academic.json` does not exist or has no `gpa` field, `data.gpa` is `null`. If `tests.json` does not exist or has no entries, `data.testScores` is `null`. Same for the other sections. The client renders a section block only when the corresponding field is non-null and non-empty.
+**Null sections:** If `academic.json` does not exist or has no GPA field in either the nested (`academicData.gpa.overall.value`) or flat (`gpa`) schema, `data.gpa` is `null`. If `tests.json` does not exist or has no entries, `data.testScores` is `null`. Same for the other sections. The client renders a section block only when the corresponding field is non-null and non-empty.
 
 **Error cases:**
 
@@ -682,3 +685,4 @@ N/A — no AI in this story beyond surfacing data from AI calls that belong to o
 | Release | Date | Summary | Type |
 |---------|------|---------|------|
 | 1.1.2 | 2026-06-15 | Initial spec authored — questionnaire modal, reasoning offcanvas, essay provenance modal, inline reasoning display, inline provenance citations, GET /api/essays/provenance endpoint, provenanceSelection on POST /api/essays/generate | feature |
+| 1.1.3 | 2026-06-15 | Gap merged: GET /api/essays/provenance and _resolveProvenanceUsed updated to handle both rich nested (academicData.gpa.overall.*) and flat (gpa) schemas from academic.json, with nested schema taking priority | gap-merge |

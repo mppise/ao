@@ -29,4 +29,7 @@ warnings:
   - "Activities and Achievements detail views updated to show source badges using _buildSourceBadge()."
   - "New API client functions: getCourses(), updateCourse(), deleteCourse(), createCourse()."
   - "New backend endpoints: GET /api/profile/academic/courses, PUT /api/profile/academic/course/:id, DELETE /api/profile/academic/course/:id, POST /api/profile/academic/course."
+  - "BUG FIX (2026-06-15): course merge mode overwrote source with plain string; fixed to set proper {type,documentId,documentName,extractedAt} object."
+  - "BUG FIX (2026-06-15): _buildSourceBadge updated to handle legacy string source values (shows 'From [filename]'), extracted items without documentName (shows 'From document'), and manual/null sources (shows 'Manually added')."
+  - "BUG FIX (2026-06-15): Added source badges to SAT and ACT cards in the Tests detail page — SAT/ACT source is a string filename; _buildSourceBadge now handles this correctly."
 overall_status: pass

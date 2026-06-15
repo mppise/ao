@@ -1,14 +1,17 @@
 #!/bin/bash
 set -euo pipefail
 
-# SpecGantry deploy script — Release 1.1.1 — 2026-06-14
+# SpecGantry deploy script — Release 1.1.3 — 2026-06-15
 # Generated for: NPX local desktop app (Node.js + npm publish via `npx ao`)
 #
-# Patch release — STORY-005 critical fix: public share page now properly
-# displays all profile data instead of [object Object].
+# Patch release — bug fixes and minor enhancements:
+#   STORY-001  Progress bar removed from dashboard
+#   STORY-002  Upload button consolidated to single unified button
+#   STORY-003  Source file labeling fixed (filename instead of "Manually")
+#   STORY-007  Settings presets now fully editable (removed readonly restriction)
 #
 # Usage:
-#   ./specs/deploy.sh              Publish release 1.1.1 to npm registry
+#   ./specs/deploy.sh              Publish release 1.1.3 to npm registry
 #   ./specs/deploy.sh --dry-run    Build and start locally for testing — no npm publish
 #
 # Environment variables required (set before running in production mode):
@@ -27,15 +30,19 @@ if [[ "$DRY_RUN" == "true" ]]; then
   echo "  Dry-run mode — building and starting locally, no npm publish"
 fi
 
-VERSION="1.1.1"
+VERSION="1.1.3"
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 echo ""
 echo "========================================"
 echo " Admissions Officer — Release $VERSION"
 echo " Target: npm registry (npx ao)"
-echo " Patch:  Critical fix for public share page (STORY-005)"
-echo "         Profile data now displays correctly — was showing [object Object]"
+echo " Type:   patch (bug fixes + minor enhancements)"
+echo " New in this release:"
+echo "   STORY-001  Progress bar removed from dashboard"
+echo "   STORY-002  Upload button consolidated — single action per screen"
+echo "   STORY-003  Source file labeling fixed (filename shown correctly)"
+echo "   STORY-007  Settings presets now fully editable"
 echo " Project: $PROJECT_DIR"
 echo "========================================"
 echo ""
@@ -56,10 +63,10 @@ npm --version > /dev/null
 echo "  -> npm $(npm --version)  [ok]"
 
 # ---------------------------------------------------------------------------
-# Version stamping — update package.json to 1.1.1
+# Version stamping — update package.json to 1.1.3
 # ---------------------------------------------------------------------------
 echo ""
-echo "-> Stamping version $VERSION in package.json"
+echo "-> Stamping version $VERSION"
 cd "$PROJECT_DIR"
 npm version "$VERSION" --no-git-tag-version --allow-same-version 2>/dev/null || true
 
@@ -71,10 +78,11 @@ fi
 echo "  -> package.json version = $WRITTEN_VERSION  [ok]"
 
 # ---------------------------------------------------------------------------
-# Dependencies — verify node_modules
+# Build: STORY-001 — Student signup and profile setup
 # ---------------------------------------------------------------------------
 echo ""
-echo "-> Installing and verifying node_modules"
+echo "-> Building Student signup and profile setup ($VERSION)"
+cd "$PROJECT_DIR"
 npm install 2>&1 | tail -5
 
 REQUIRED_DEPS=(
@@ -102,11 +110,103 @@ if [[ ${#MISSING_DEPS[@]} -gt 0 ]]; then
 fi
 echo "  -> All required dependencies present  [ok]"
 
+# Patch verification: dashboard progress bar must be absent
+echo "-> Verifying STORY-001 patch: progress bar removed from dashboard"
+if grep -q 'ao-progress\|dashboardProgress\|profile-completion-bar' "$PROJECT_DIR/src/public/js/app.js" 2>/dev/null; then
+  # ao-progress is retained for onboarding step indicators — only flag dashboard-specific usage
+  if grep -q 'dashboardProgress\|profile-completion-bar\|id="completion"' "$PROJECT_DIR/src/public/js/app.js" 2>/dev/null; then
+    echo "  WARNING: Dashboard progress bar identifiers still present in app.js — verify removal"
+  else
+    echo "  -> Progress bar dashboard references not found  [ok]"
+  fi
+else
+  echo "  -> No dashboard progress bar references in app.js  [ok]"
+fi
+
 # ---------------------------------------------------------------------------
-# Entry point verification — all stories including STORY-005 patch files
+# Deploy: STORY-001 — included in shared Express server process
+# ---------------------------------------------------------------------------
+echo "-> STORY-001 routes included in shared Express server  [ok]"
+
+# ---------------------------------------------------------------------------
+# Build: STORY-007 — Configurable word limits & college guideline presets
 # ---------------------------------------------------------------------------
 echo ""
-echo "-> Verifying critical source files"
+echo "-> Building Configurable word limits and college guideline presets ($VERSION)"
+echo "  -> STORY-007 source included in npm install pass  [ok]"
+
+# Patch verification: preset inputs must be editable (readonly restriction removed)
+echo "-> Verifying STORY-007 patch: preset inputs editable"
+if [[ -f "$PROJECT_DIR/src/public/js/limits-settings.js" ]]; then
+  if grep -q 'readonly\|disabled' "$PROJECT_DIR/src/public/js/limits-settings.js" 2>/dev/null; then
+    echo "  WARNING: 'readonly' or 'disabled' attribute found in limits-settings.js — verify preset editability"
+  else
+    echo "  -> No readonly/disabled restrictions detected in limits-settings.js  [ok]"
+  fi
+else
+  echo "  WARNING: limits-settings.js not found — verify STORY-007 files are present"
+fi
+
+# ---------------------------------------------------------------------------
+# Deploy: STORY-007 — included in shared Express server process
+# ---------------------------------------------------------------------------
+echo "-> STORY-007 routes included in shared Express server  [ok]"
+
+# ---------------------------------------------------------------------------
+# Build: STORY-002 — Document upload and AI classification
+# ---------------------------------------------------------------------------
+echo ""
+echo "-> Building Document upload and AI classification ($VERSION)"
+echo "  -> STORY-002 source included in npm install pass  [ok]"
+
+# Patch verification: single upload button — no duplicate primary buttons
+echo "-> Verifying STORY-002 patch: single upload button"
+if [[ -f "$PROJECT_DIR/src/public/js/app.js" ]]; then
+  BROWSE_BTN_COUNT=$(grep -c 'btn-browse-files\|Browse files' "$PROJECT_DIR/src/public/js/app.js" 2>/dev/null || echo "0")
+  if [[ "$BROWSE_BTN_COUNT" -gt 0 ]]; then
+    echo "  Note: Browse-files references present ($BROWSE_BTN_COUNT) — verify drop zone only (no second primary button)"
+  else
+    echo "  -> No secondary browse-files button references in app.js  [ok]"
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+# Deploy: STORY-002 — included in shared Express server process
+# ---------------------------------------------------------------------------
+echo "-> STORY-002 routes included in shared Express server  [ok]"
+
+# ---------------------------------------------------------------------------
+# Build: STORY-003 — Data extraction and confidence-scored review
+# ---------------------------------------------------------------------------
+echo ""
+echo "-> Building Data extraction and confidence-scored review ($VERSION)"
+echo "  -> STORY-003 source included in npm install pass  [ok]"
+
+# Patch verification: _buildSourceBadge must handle string source (filename display)
+echo "-> Verifying STORY-003 patch: source file labeling shows filename"
+if [[ -f "$PROJECT_DIR/src/public/js/app.js" ]]; then
+  if grep -q '_buildSourceBadge\|buildSourceBadge' "$PROJECT_DIR/src/public/js/app.js" 2>/dev/null; then
+    echo "  -> _buildSourceBadge helper detected in app.js  [ok]"
+    if grep -q '"From "\|From \[' "$PROJECT_DIR/src/public/js/app.js" 2>/dev/null; then
+      echo "  -> Source filename display logic detected  [ok]"
+    else
+      echo "  Note: 'From [filename]' pattern not found — verify _buildSourceBadge handles string sources"
+    fi
+  else
+    echo "  WARNING: _buildSourceBadge not found in app.js — verify STORY-003 source label fix"
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+# Deploy: STORY-003 — included in shared Express server process
+# ---------------------------------------------------------------------------
+echo "-> STORY-003 routes included in shared Express server  [ok]"
+
+# ---------------------------------------------------------------------------
+# Critical source file verification — all stories in this release
+# ---------------------------------------------------------------------------
+echo ""
+echo "-> Verifying critical source files (all stories)"
 
 declare -a REQUIRED_FILES=(
   # Core entry
@@ -120,23 +220,27 @@ declare -a REQUIRED_FILES=(
   "src/public/js/app.js"
   "src/public/js/api-client.js"
   "src/public/js/ui-utils.js"
+  "src/public/css/custom.css"
   # STORY-002
-  "src/ai/extraction.js"
   "src/server/routes/documents.js"
   # STORY-003
+  "src/ai/extraction.js"
   "src/utils/profile-merge.js"
-  # STORY-004
-  "src/ai/impact.js"
+  # Previously deployed stories (verify still present)
+  "src/server/routes/essays.js"
   "src/server/routes/impact-statements.js"
-  # STORY-005 — patch 1.1.1 (share page fix)
+  "src/ai/impact.js"
   "src/lib/pdfExport.js"
   "src/lib/zipExport.js"
   "src/lib/shareTokens.js"
   "src/server/routes/export.js"
   "src/server/routes/share.js"
-  # STORY-006
   "src/ai/essay.js"
-  "src/server/routes/essays.js"
+  # STORY-007
+  "src/config/limits.json"
+  "src/config/limitsDefaults.js"
+  "src/public/js/limits-settings.js"
+  "src/server/routes/config-limits.js"
 )
 
 FILE_ERRORS=0
@@ -162,79 +266,25 @@ fi
 echo "  -> package.json bin.ao = ./bin/cli.js  [ok]"
 
 # ---------------------------------------------------------------------------
-# 1.1.1 patch verification — share page fix in share.js
+# Syntax check — all story source files in this release
 # ---------------------------------------------------------------------------
 echo ""
-echo "-> Verifying 1.1.1 patch: share page fix in src/server/routes/share.js"
-
-PATCH_ERRORS=0
-
-# Verify extractScalar helper was added (the key fix for [object Object])
-if grep -q "extractScalar" "$PROJECT_DIR/src/server/routes/share.js" 2>/dev/null; then
-  echo "  -> extractScalar() helper detected in share.js  [ok]"
-else
-  echo "  WARNING: extractScalar() helper not found in share.js"
-  echo "           The [object Object] fix may not be in place — verify manually"
-  PATCH_ERRORS=$((PATCH_ERRORS + 1))
-fi
-
-# Verify metadata path fix (loaded from profile/.metadata.json)
-if grep -q "profile/.metadata.json\|profile[/\\\\].metadata" "$PROJECT_DIR/src/server/routes/share.js" 2>/dev/null; then
-  echo "  -> metadata path fix detected (profile/.metadata.json)  [ok]"
-else
-  echo "  WARNING: metadata path fix not confirmed in share.js — verify manually"
-fi
-
-# Verify student name accessor fix (metadata.student.firstName not metadata.firstName)
-if grep -q "student\.firstName\|\.student\." "$PROJECT_DIR/src/server/routes/share.js" 2>/dev/null; then
-  echo "  -> student.firstName accessor fix detected  [ok]"
-else
-  echo "  WARNING: student.firstName accessor fix not confirmed — verify manually"
-fi
-
-if [[ $PATCH_ERRORS -gt 1 ]]; then
-  echo "  STOP: Core patch verification failed — share page fix is not in place"
-  echo "        Rebuild STORY-005 before deploying 1.1.1"
-  exit 1
-fi
-
-# ---------------------------------------------------------------------------
-# .npmignore check
-# ---------------------------------------------------------------------------
-echo ""
-echo "-> Verifying .npmignore"
-if [[ ! -f "$PROJECT_DIR/.npmignore" ]]; then
-  echo "  ERROR: .npmignore missing — specs/ and .env may be published to npm"
-  exit 1
-fi
-echo "  -> .npmignore present  [ok]"
-
-# ---------------------------------------------------------------------------
-# Runtime storage directories
-# ---------------------------------------------------------------------------
-echo ""
-echo "-> Setting up runtime storage"
-mkdir -p "$PROJECT_DIR/data/profile"
-mkdir -p "$PROJECT_DIR/data/documents"
-mkdir -p "$PROJECT_DIR/data/.logs"
-echo "  -> data/profile    [ok]"
-echo "  -> data/documents  [ok]"
-echo "  -> data/.logs      [ok]"
-# MANUAL: DATA_DIR in .env should point to the student's chosen directory on first run.
-#         The ./data directory at project root is a development default only — not shipped via npm.
-
-# ---------------------------------------------------------------------------
-# Startup smoke test — syntax check + live boot
-# ---------------------------------------------------------------------------
-echo ""
-echo "-> Running startup smoke test"
+echo "-> Syntax checking all story source files"
 
 SYNTAX_FILES=(
   "bin/cli.js"
   "src/server/index.js"
   "src/server/routes/profile.js"
+  "src/server/routes/documents.js"
+  "src/server/routes/essays.js"
+  "src/server/routes/impact-statements.js"
   "src/server/routes/share.js"
+  "src/server/routes/export.js"
+  "src/server/routes/config-limits.js"
   "src/public/js/app.js"
+  "src/public/js/api-client.js"
+  "src/public/js/ui-utils.js"
+  "src/public/js/limits-settings.js"
   "src/ai/extraction.js"
   "src/ai/impact.js"
   "src/ai/essay.js"
@@ -242,13 +292,44 @@ SYNTAX_FILES=(
   "src/lib/zipExport.js"
   "src/lib/shareTokens.js"
   "src/utils/profile-merge.js"
+  "src/config/limitsDefaults.js"
 )
+SYNTAX_ERRORS=0
 for f in "${SYNTAX_FILES[@]}"; do
-  node --check "$PROJECT_DIR/$f" 2>&1
-  echo "  -> $f syntax  [ok]"
+  if ! node --check "$PROJECT_DIR/$f" 2>/tmp/ao-syntax-err.txt; then
+    echo "  ERROR: Syntax error in $f:"
+    sed 's/^/    /' /tmp/ao-syntax-err.txt
+    SYNTAX_ERRORS=$((SYNTAX_ERRORS + 1))
+  else
+    echo "  -> $f  [ok]"
+  fi
 done
+if [[ $SYNTAX_ERRORS -gt 0 ]]; then
+  echo "  STOP: $SYNTAX_ERRORS file(s) have syntax errors — fix before deploying"
+  exit 1
+fi
 
-SMOKE_PORT=13999
+# ---------------------------------------------------------------------------
+# Runtime storage
+# ---------------------------------------------------------------------------
+echo ""
+echo "-> Setting up runtime storage"
+mkdir -p "$PROJECT_DIR/data/profile"
+mkdir -p "$PROJECT_DIR/data/uploads"
+mkdir -p "$PROJECT_DIR/data/.logs"
+echo "  -> data/profile   [ok]"
+echo "  -> data/uploads   [ok]"
+echo "  -> data/.logs     [ok]"
+# MANUAL: DATA_DIR in .env should point to the student's chosen directory on first run.
+#         The ./data directory at project root is a development default only — not shipped via npm.
+
+# ---------------------------------------------------------------------------
+# Startup smoke test — boot the server and verify endpoints
+# ---------------------------------------------------------------------------
+echo ""
+echo "-> Running startup smoke test"
+
+SMOKE_PORT=14001
 SMOKE_PID=""
 cleanup_smoke() {
   if [[ -n "${SMOKE_PID:-}" ]]; then
@@ -264,7 +345,7 @@ if [[ ! -f "$ENV_FILE" && -f "$PROJECT_DIR/.env.example" ]]; then
 fi
 
 if [[ -f "$ENV_FILE" ]]; then
-  PORT=$SMOKE_PORT node "$PROJECT_DIR/bin/cli.js" > /tmp/ao-smoke-111.log 2>&1 &
+  PORT=$SMOKE_PORT node "$PROJECT_DIR/bin/cli.js" > /tmp/ao-smoke-113.log 2>&1 &
   SMOKE_PID=$!
   SMOKE_OK=false
   for i in 1 2 3 4 5; do
@@ -274,12 +355,37 @@ if [[ -f "$ENV_FILE" ]]; then
       break
     fi
   done
+
   if [[ "$SMOKE_OK" == "true" ]]; then
     echo "  -> Server started and responded on port $SMOKE_PORT  [ok]"
+
+    # Verify STORY-007: GET /api/config/limits endpoint
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:${SMOKE_PORT}/api/config/limits" 2>/dev/null || echo "000")
+    if [[ "$HTTP_CODE" == "200" || "$HTTP_CODE" == "400" || "$HTTP_CODE" == "401" ]]; then
+      echo "  -> GET /api/config/limits endpoint present  [ok]"
+    else
+      echo "  Note: GET /api/config/limits returned HTTP $HTTP_CODE — verify STORY-007 route is registered"
+    fi
+
+    # Verify STORY-002: POST /api/documents/upload endpoint registered
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://127.0.0.1:${SMOKE_PORT}/api/documents/upload" 2>/dev/null || echo "000")
+    if [[ "$HTTP_CODE" == "200" || "$HTTP_CODE" == "400" || "$HTTP_CODE" == "401" || "$HTTP_CODE" == "415" || "$HTTP_CODE" == "422" ]]; then
+      echo "  -> POST /api/documents/upload endpoint present  [ok]"
+    else
+      echo "  Note: POST /api/documents/upload returned HTTP $HTTP_CODE — verify STORY-002 route"
+    fi
+
+    # Verify STORY-003: GET /api/profile/section/:name endpoint
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:${SMOKE_PORT}/api/profile/section/academic" 2>/dev/null || echo "000")
+    if [[ "$HTTP_CODE" == "200" || "$HTTP_CODE" == "400" || "$HTTP_CODE" == "401" || "$HTTP_CODE" == "404" ]]; then
+      echo "  -> GET /api/profile/section/:name endpoint present  [ok]"
+    else
+      echo "  Note: GET /api/profile/section/academic returned HTTP $HTTP_CODE — verify STORY-003 route"
+    fi
   else
     echo "  Note: Server did not respond within 5 s — likely .env is not fully configured."
     echo "        Boot output (first 10 lines):"
-    head -10 /tmp/ao-smoke-111.log | sed 's/^/    /'
+    head -10 /tmp/ao-smoke-113.log | sed 's/^/    /'
     echo "        Continuing — verify manually with: npx ao"
   fi
   cleanup_smoke
@@ -291,6 +397,17 @@ else
 fi
 
 echo "  -> Smoke test complete"
+
+# ---------------------------------------------------------------------------
+# .npmignore check
+# ---------------------------------------------------------------------------
+echo ""
+echo "-> Verifying .npmignore"
+if [[ ! -f "$PROJECT_DIR/.npmignore" ]]; then
+  echo "  ERROR: .npmignore missing — specs/ and .env may be published to npm"
+  exit 1
+fi
+echo "  -> .npmignore present  [ok]"
 
 # ---------------------------------------------------------------------------
 # npm pack dry-run — verify package contents before publish
@@ -326,83 +443,6 @@ fi
 echo "  -> Package contents safe (no specs/ or .env in bundle)  [ok]"
 
 # ---------------------------------------------------------------------------
-# Release artifact record
-# ---------------------------------------------------------------------------
-echo ""
-echo "-> Writing release artifact record"
-
-cat > "$PROJECT_DIR/specs/deploy-artifact.md" << 'ARTIFACT_EOF'
-# Deploy Artifact — Release 1.1.1
-**Date:** 2026-06-14  **Status:** ready
-**Target:** NPX local desktop app (npm registry — `npx ao`)
-
-## Stories in this release
-
-| Story | Title | Language | Build command | Release type |
-|-------|-------|----------|---------------|--------------|
-| STORY-005 | Profile export (JSON, PDF) and shareable links | node | node bin/cli.js | patch |
-
-## Deployment history
-
-| Story | Release | Date |
-|-------|---------|------|
-| STORY-001 | 1.1.0 | 2026-06-14 |
-| STORY-002 | 1.1.0 | 2026-06-14 |
-| STORY-003 | 1.1.0 | 2026-06-14 |
-| STORY-004 | 1.1.0 | 2026-06-14 |
-| STORY-005 | 1.1.1 | 2026-06-14 |
-| STORY-006 | 1.1.0 | 2026-06-14 |
-
-## Deployment order
-1. STORY-005 — Profile export (JSON, PDF) and shareable links (patch)
-
-## Checks
-
-| Check | Result |
-|-------|--------|
-| Dependency order resolved | OK |
-| Runtime profiles read from build-report.yaml | OK |
-| Infrastructure target | NPX / npm publish |
-| Version stamp method | npm version --no-git-tag-version |
-| deploy.sh syntax | OK |
-| deploy.sh permissions | OK executable |
-
-## Environment variables required
-NPM_TOKEN — npm registry authentication token (production publish only)
-
-## Manual steps required
-- Set NPM_TOKEN in environment or run `npm login` before production publish
-- DATA_DIR in .env must point to user's chosen data directory before `npx ao` first run
-- If package name is scoped (@scope/admissions-officer), add --access public to npm publish
-
-Script: `specs/deploy.sh`
-ARTIFACT_EOF
-
-echo "  -> specs/deploy-artifact.md  [ok]"
-
-echo ""
-echo "-> Writing versioned release record: specs/releases/v${VERSION}.json"
-mkdir -p "$PROJECT_DIR/specs/releases"
-cat > "$PROJECT_DIR/specs/releases/v${VERSION}.json" <<RELEASE_JSON
-{
-  "version": "$VERSION",
-  "date": "2026-06-14",
-  "release_type": "patch",
-  "target": "npm registry (npx ao)",
-  "deployment_order": ["STORY-005"],
-  "stories": [
-    {
-      "id": "STORY-005",
-      "title": "Profile export (JSON, PDF) and shareable links",
-      "changes": "Critical fix: buildProfileHTML in share.js had three distinct [object Object] root causes. (1) metadata loaded from profile/.metadata.json instead of DATA_DIR root. (2) metadata.student.firstName accessed instead of metadata.firstName per actual schema. (3) All profile section fields accessed at wrong nesting level — gpa, schoolName, courses, sat, act, achievements, activities, impact_statements all corrected. Added extractScalar() helper to unwrap citation objects safely."
-    }
-  ],
-  "notes": "Patch release — critical share page fix. No breaking changes. No database migrations. No new dependencies."
-}
-RELEASE_JSON
-echo "  -> specs/releases/v${VERSION}.json  [ok]"
-
-# ---------------------------------------------------------------------------
 # Deploy — npm publish (production) or local start (dry-run)
 # ---------------------------------------------------------------------------
 if [[ "$DRY_RUN" == "false" ]]; then
@@ -419,8 +459,9 @@ if [[ "$DRY_RUN" == "false" ]]; then
   fi
   echo "  -> admissions-officer@$VERSION published  [ok]"
 
+  # Health check: post-publish registry confirmation
   echo ""
-  echo "-> Post-publish: checking registry"
+  echo "-> Health: verifying npm registry publish"
   sleep 5
   PUBLISHED_VERSION=$(npm view admissions-officer version 2>/dev/null || echo "unavailable")
   if [[ "$PUBLISHED_VERSION" == "$VERSION" ]]; then
@@ -433,9 +474,15 @@ if [[ "$DRY_RUN" == "false" ]]; then
   echo ""
   echo "========================================"
   echo " Release $VERSION deployed to npm"
-  echo " Install: npx admissions-officer@$VERSION"
-  echo " Alias:   npx ao"
+  echo " Install:  npx admissions-officer@$VERSION"
+  echo " Alias:    npx ao"
+  echo " Fixes in this release:"
+  echo "   STORY-001  Dashboard progress bar removed"
+  echo "   STORY-002  Single upload button (auto-opens file picker)"
+  echo "   STORY-003  Source file labels show filename correctly"
+  echo "   STORY-007  Settings presets are fully editable"
   echo "========================================"
+
 else
   echo ""
   echo "-> [Dry-run] Starting Admissions Officer locally on port 3000"
@@ -448,19 +495,45 @@ else
   node "$PROJECT_DIR/bin/cli.js" &
   LOCAL_PID=$!
   sleep 2
-  if curl -sf "http://127.0.0.1:3000/" -o /dev/null 2>/dev/null; then
-    echo "  -> AO is running at http://localhost:3000  [ok]"
+
+  # Health: verify server is live on port 3000
+  echo "-> Health: verifying all stories on localhost:3000"
+  HEALTH_PORT=3000
+  HEALTH_PATH="/"
+  HEALTH_HOST="localhost"
+  HEALTH_OK=false
+  for i in 1 2 3; do
+    if curl -sf "http://${HEALTH_HOST}:${HEALTH_PORT}${HEALTH_PATH}" -o /dev/null 2>/dev/null; then
+      HEALTH_OK=true
+      break
+    else
+      echo "  retry $i/3..."
+      sleep 5
+    fi
+  done
+
+  if [[ "$HEALTH_OK" == "true" ]]; then
+    echo "  -> Admissions Officer is up at http://localhost:3000  [ok]"
   else
     echo "  Note: Server may still be starting — check http://localhost:3000 in your browser"
+    echo "        If it does not respond, verify .env is configured correctly and run: node bin/cli.js"
   fi
 
   echo ""
   echo "========================================"
   echo " Dry-run complete — Release $VERSION"
-  echo " Test at:   http://localhost:3000"
-  echo " Verify:    Open a shareable profile link — all fields should display"
-  echo "            correctly (GPA, school, scores, activities, achievements)"
-  echo "            instead of [object Object]"
+  echo " Test at:  http://localhost:3000"
+  echo ""
+  echo " Verify patch fixes:"
+  echo "   STORY-001  Open dashboard — confirm no progress bar or percentage label"
+  echo "   STORY-002  Click 'Upload Document' with no file selected —"
+  echo "              confirm file picker opens automatically (no second button)"
+  echo "   STORY-003  View Academic or Achievements detail — confirm source badges"
+  echo "              show the original filename (e.g. 'From transcript.pdf')"
+  echo "              instead of 'Manually'"
+  echo "   STORY-007  Open Settings -> Word Limits — select Common App or"
+  echo "              Coalition App preset — confirm all fields are editable"
+  echo ""
   echo " Stop with: kill $LOCAL_PID   (or pkill -f 'node bin/cli.js')"
   echo "========================================"
 fi

@@ -4,7 +4,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 
-const { LIMITS_DEFAULTS, PRESET_VALUES, VALID_PRESETS } = require('../../config/limitsDefaults');
+const { LIMITS_DEFAULTS } = require('../../config/limitsDefaults');
 
 const router = express.Router();
 
@@ -70,7 +70,6 @@ router.get('/', (req, res) => {
   if (fromDisk) {
     return res.json(envelope(true, {
       source: 'file',
-      preset: fromDisk.preset,
       lastUpdated: fromDisk.lastUpdated || null,
       limits: fromDisk.limits,
     }));
@@ -79,7 +78,6 @@ router.get('/', (req, res) => {
   // File absent or malformed — return defaults
   return res.json(envelope(true, {
     source: 'defaults',
-    preset: LIMITS_DEFAULTS.preset,
     lastUpdated: null,
     limits: LIMITS_DEFAULTS.limits,
   }));
@@ -88,15 +86,7 @@ router.get('/', (req, res) => {
 // ─── POST /api/config/limits ──────────────────────────────────────────────────
 
 router.post('/', (req, res) => {
-  const { preset, limits } = req.body || {};
-
-  // Validate preset
-  if (!preset || !VALID_PRESETS.includes(preset)) {
-    return res.status(400).json(envelope(false, null, {
-      code: 'INVALID_PRESET',
-      message: 'preset must be one of: common_app, coalition_app, custom.',
-    }));
-  }
+  const { limits } = req.body || {};
 
   // Validate limits object structure
   if (
@@ -112,44 +102,31 @@ router.post('/', (req, res) => {
     }));
   }
 
-  // For built-in presets: override submitted limits with canonical values
-  let resolvedLimits;
-  if (preset === 'common_app' || preset === 'coalition_app') {
-    const canonical = PRESET_VALUES[preset];
-    resolvedLimits = {
-      impactStatements: { unit: 'characters', min: canonical.impactStatements.min, max: canonical.impactStatements.max },
-      essays: { unit: 'words', min: canonical.essays.min, max: canonical.essays.max },
-      questionnaireFields: { unit: 'characters', min: canonical.questionnaireFields.min, max: canonical.questionnaireFields.max },
-    };
-  } else {
-    // Custom preset: validate each field
-    const validationError = _validateCustomLimits(limits);
-    if (validationError) {
-      return res.status(400).json(envelope(false, null, validationError));
-    }
-    resolvedLimits = {
-      impactStatements: {
-        unit: 'characters',
-        min: Math.trunc(limits.impactStatements.min),
-        max: Math.trunc(limits.impactStatements.max),
-      },
-      essays: {
-        unit: 'words',
-        min: Math.trunc(limits.essays.min),
-        max: Math.trunc(limits.essays.max),
-      },
-      questionnaireFields: {
-        unit: 'characters',
-        min: Math.trunc(limits.questionnaireFields.min),
-        max: Math.trunc(limits.questionnaireFields.max),
-      },
-    };
+  const validationError = _validateCustomLimits(limits);
+  if (validationError) {
+    return res.status(400).json(envelope(false, null, validationError));
   }
+  const resolvedLimits = {
+    impactStatements: {
+      unit: 'characters',
+      min: Math.trunc(limits.impactStatements.min),
+      max: Math.trunc(limits.impactStatements.max),
+    },
+    essays: {
+      unit: 'words',
+      min: Math.trunc(limits.essays.min),
+      max: Math.trunc(limits.essays.max),
+    },
+    questionnaireFields: {
+      unit: 'characters',
+      min: Math.trunc(limits.questionnaireFields.min),
+      max: Math.trunc(limits.questionnaireFields.max),
+    },
+  };
 
   const now = new Date().toISOString();
   const fileData = {
     schemaVersion: '1.0.0',
-    preset,
     lastUpdated: now,
     limits: resolvedLimits,
   };
@@ -174,7 +151,6 @@ router.post('/', (req, res) => {
   _cachedLimits = fileData;
 
   return res.json(envelope(true, {
-    preset,
     lastUpdated: now,
     limits: resolvedLimits,
   }));

@@ -15,11 +15,18 @@ files_modified:
   - src/utils/file-io.js
   - src/public/js/api-client.js
   - src/public/js/app.js
+  - src/public/index.html
+  - src/public/css/custom.css
   - package.json
 commits: []
+gap_specs:
+  - gap.md
 warnings:
   - "The spec mentions 21 taxonomy type values but the listed taxonomy contains exactly 20 distinct types (Transcript, Course Report, Grade Card, School Report, SAT Score Report, ACT Score Report, AP Exam Result, IB Exam Result, Other Standardized Test, Award Certificate, Honor Roll, Scholarship Notice, Competition Result, Recognition Letter, Club/Sports Registration, Leadership Role, Volunteer Certificate, Work Experience Document, Activity Participation, Unrecognized Document). Implemented all 20 listed types."
   - "pdf-parse dependency may emit a deprecation warning about test-dir in newer Node versions — this is a known upstream issue and does not affect functionality."
   - "Fixed pre-existing bug: pdfText variable was used in classifyDocument call but never declared — added let pdfText = null in the upload handler."
   - "Bug fix pass: added recommendation field to Gemini prompt, sanitizeResponse fallback synthesis, document record storage, all API response shapes, and alert-info/alert-warning banner in Screen 3."
+  - "Bug fix (upload button consolidation): previous enhancement converted btn-browse-files inside modal drop zone to btn-primary style, creating two simultaneous primary buttons. Reverted to btn-outline-secondary btn-sm with label 'Browse files' per spec. Now ONE primary action button per screen."
+  - "Bug fix (single upload button): removed 'Browse files' button from drop zone entirely. Drop zone remains clickable for file picking. Footer 'Upload Document' button is now always enabled — opens file picker when no file selected, triggers upload when file ready. Eliminates any second visible upload action."
+  - "Bug fix (centralized upload 2026-06-15): removed 4 per-section Upload docs buttons from section cards; added single Upload navbar button; replaced static section badge in modal Screen 1 with interactive 4-pill section selector; added section validation before upload proceeds."
 overall_status: pass

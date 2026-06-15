@@ -316,7 +316,13 @@ function mergeExtractedData(dataDir, documentType, fields, sourceDoc, sourceUplo
               if (course.score !== null && course.score !== undefined) existing.score = course.score;
               if (course.term !== null && course.term !== undefined) existing.term = course.term;
               if (course.level !== null && course.level !== undefined) existing.level = course.level;
-              existing.source = sourceDoc;
+              // Preserve source as proper object (not string) for correct badge display
+              existing.source = {
+                type: 'extracted',
+                documentId: _documentId,
+                documentName: sourceDoc,
+                extractedAt: savedAt,
+              };
               existing.sourceUploadedAt = sourceUploadedAt;
               existing.savedAt = savedAt;
               duplicatesDetected++;

@@ -16,7 +16,14 @@ function buildEssayPrompt(profileData) {
   const gpaStr = gpa || 'Not provided';
   const testScoresStr = testScores || 'Not provided';
   const coursesStr = courses && courses.length > 0
-    ? courses.slice(0, 10).join(', ')
+    ? courses.slice(0, 10).map(c => {
+        if (typeof c === 'string') return c;
+        // Object schema: { name, grade, level }
+        let label = c.name || '';
+        if (c.level) label += ` (${c.level})`;
+        if (c.grade != null) label += ` — ${c.grade}`;
+        return label;
+      }).filter(Boolean).join(', ')
     : 'Not provided';
 
   const achievementsStr = achievements && achievements.length > 0
@@ -97,156 +104,220 @@ function assembleProfileData(dataDir, provenanceSelection) {
   const profileDir = path.join(dataDir, 'profile');
   const sel = (provenanceSelection && typeof provenanceSelection === 'object') ? provenanceSelection : null;
 
-  // Academic — GPA
+  // ── Academic (academic.json) ────────────────────────────────────────────────
+  // The file is written in two schemas:
+  //   Init schema:  { data: { gpa, courses: [] }, sources: [] }
+  //   Merged schema: { gpa: { overall: { value, confidence } }, courses: [{ name, grade, level }],
+  //                    apIbScores: [...] }  (top-level, no data wrapper)
   let gpa = null;
-  let testScores = null;
   let courses = [];
 
-  // Only include GPA if not explicitly excluded by provenance selection
   const includeGpa = !sel || sel.includeGpa !== false;
-  if (includeGpa) {
-    try {
-      const academic = readJSON(path.join(profileDir, 'academic.json'));
-      if (academic) {
-        // Support both rich schema (gpa.overall.value) and simple schema (data.gpa)
-        if (academic.gpa && academic.gpa.overall && academic.gpa.overall.value != null) {
-          gpa = String(academic.gpa.overall.value);
-        } else if (academic.data && academic.data.gpa != null) {
-          gpa = String(academic.data.gpa);
-          courses = academic.data.courses || [];
-        }
-      }
-    } catch (_) { /* file absent — skip */ }
-  }
 
-  // Courses — always included (not individually toggleable per spec)
   try {
     const academic = readJSON(path.join(profileDir, 'academic.json'));
     if (academic) {
-      if (academic.data && academic.data.courses) {
+      // ── GPA ──────────────────────────────────────────────────────────────
+      if (includeGpa) {
+        // Merged schema: gpa.overall.value
+        if (academic.gpa && academic.gpa.overall && academic.gpa.overall.value != null) {
+          gpa = String(academic.gpa.overall.value);
+        // Init schema: data.gpa
+        } else if (academic.data && academic.data.gpa != null) {
+          gpa = String(academic.data.gpa);
+        // Flat top-level fallback
+        } else if (academic.gpa != null && typeof academic.gpa !== 'object') {
+          gpa = String(academic.gpa);
+        }
+      }
+
+      // ── Courses (always included per spec — not individually toggleable) ──
+      // Merged schema: top-level courses[]
+      if (Array.isArray(academic.courses) && academic.courses.length > 0) {
+        courses = academic.courses;
+      // Init schema: data.courses[]
+      } else if (academic.data && Array.isArray(academic.data.courses)) {
         courses = academic.data.courses;
       }
     }
-  } catch (_) { /* skip */ }
+  } catch (_) { /* file absent — skip */ }
 
-  // Test scores — filtered by testScoreIds if provided
+  // ── Test scores (tests.json) ────────────────────────────────────────────────
+  // Init schema:   { data: { sat: null, act: null, ap: [], ib: [], other: [] } }
+  // Merged schema: { sat: { score: { math, ebrw, total }, dateTaken, confidence },
+  //                  act: { score: { english, math, reading, science, composite } },
+  //                  ap:  [{ examName, score }], ib: [{ subject, level, score }],
+  //                  other: [...] }  — all at top-level, no data wrapper
+  let testScores = null;
+
   try {
-    const tests = readJSON(path.join(profileDir, 'tests.json'));
-    if (tests) {
-      // Support both rich items schema and simple data schema
-      let items = [];
-      if (tests.data && tests.data.items) {
-        items = tests.data.items;
-      } else if (Array.isArray(tests.data)) {
-        items = tests.data;
-      } else if (Array.isArray(tests)) {
-        items = tests;
+    const testsFile = readJSON(path.join(profileDir, 'tests.json'));
+    if (testsFile) {
+      // Normalise: prefer top-level merged schema, fall back to data wrapper
+      const tests = (testsFile.sat !== undefined || testsFile.act !== undefined ||
+                     testsFile.ap !== undefined || testsFile.ib !== undefined)
+        ? testsFile
+        : (testsFile.data || {});
+
+      const parts = [];
+
+      // SAT
+      if (tests.sat && tests.sat.score) {
+        const total = tests.sat.score.total != null
+          ? tests.sat.score.total
+          : (tests.sat.score.math != null && tests.sat.score.ebrw != null
+              ? tests.sat.score.math + tests.sat.score.ebrw
+              : null);
+        if (total != null) parts.push({ id: 'sat', label: `SAT: ${total}` });
+      } else if (tests.sat != null && typeof tests.sat !== 'object') {
+        parts.push({ id: 'sat', label: `SAT: ${tests.sat}` });
       }
 
-      // Filter by testScoreIds if provided
+      // ACT
+      if (tests.act && tests.act.score) {
+        const composite = tests.act.score.composite != null ? tests.act.score.composite : null;
+        if (composite != null) parts.push({ id: 'act', label: `ACT: ${composite}` });
+      } else if (tests.act != null && typeof tests.act !== 'object') {
+        parts.push({ id: 'act', label: `ACT: ${tests.act}` });
+      }
+
+      // AP scores (may be in tests.json or academic.json apIbScores)
+      if (Array.isArray(tests.ap)) {
+        tests.ap.forEach(a => parts.push({
+          id: a.id || `ap-${a.examName}`,
+          label: `AP ${a.examName || a.name || ''}: ${a.score}`,
+        }));
+      }
+
+      // IB scores
+      if (Array.isArray(tests.ib)) {
+        tests.ib.forEach(a => parts.push({
+          id: a.id || `ib-${a.subject}`,
+          label: `IB ${a.subject || ''} (${a.level || ''}): ${a.score}`,
+        }));
+      }
+
+      // Other exams
+      if (Array.isArray(tests.other)) {
+        tests.other.forEach(o => parts.push({
+          id: o.id || `other-${o.examName}`,
+          label: `${o.examName || 'Exam'}: ${o.results || o.score || ''}`,
+        }));
+      }
+
+      // Apply testScoreIds filter if provided
+      let filteredParts = parts;
       if (sel && Array.isArray(sel.testScoreIds)) {
         if (sel.testScoreIds.length === 0) {
-          items = []; // empty array means exclude all
+          filteredParts = [];
         } else {
-          items = items.filter(t => sel.testScoreIds.includes(t.id));
+          filteredParts = parts.filter(p => sel.testScoreIds.includes(p.id));
         }
       }
 
-      // Also handle the simple tests.data schema (sat/act/ap/other)
-      if (items.length === 0 && tests.data && !tests.data.items) {
-        const parts = [];
-        if (tests.data.sat) parts.push(`SAT: ${tests.data.sat}`);
-        if (tests.data.act) parts.push(`ACT: ${tests.data.act}`);
-        if (tests.data.ap && tests.data.ap.length > 0) {
-          parts.push('AP: ' + tests.data.ap.map(t => `${t.name} (${t.score})`).join(', '));
-        }
-        if (tests.data.other && tests.data.other.length > 0) {
-          parts.push(tests.data.other.map(t => `${t.name}: ${t.score}`).join(', '));
-        }
-        if (parts.length > 0) testScores = parts.join(', ');
-      } else if (items.length > 0) {
-        testScores = items.map(t => {
-          const name = t.testName || t.name || 'Test';
-          const score = t.score || '';
-          return `${name}: ${score}`;
-        }).join(', ');
+      if (filteredParts.length > 0) {
+        testScores = filteredParts.map(p => p.label).join(', ');
       }
     }
   } catch (_) { /* skip */ }
 
-  // All achievement & activity IDs from disk
+  // ── Achievements (achievements.json) ────────────────────────────────────────
+  // Init schema:   { data: { items: [] } }
+  // Merged schema: { achievements: [{ id, awardName, title, description, category }] }
   let allAchievements = [];
+
+  try {
+    const achFile = readJSON(path.join(profileDir, 'achievements.json'));
+    if (achFile) {
+      // Merged schema: top-level achievements[]
+      let items = Array.isArray(achFile.achievements) ? achFile.achievements
+        // Init schema: data.items[]
+        : (achFile.data && Array.isArray(achFile.data.items)) ? achFile.data.items
+        : [];
+      allAchievements = items.map(item => ({
+        id: item.id,
+        name: item.awardName || item.title || item.name || 'Achievement',
+        description: item.description || item.summary || '',
+        impact_statement: null,
+      }));
+    }
+  } catch (_) { /* skip */ }
+
+  // ── Activities (activities.json) ────────────────────────────────────────────
+  // Init schema:   { data: { items: [] } }
+  // Merged schema: { activities: [{ id, activityName, title, role, description, hoursPerWeek, weeksPerYear }] }
   let allActivities = [];
 
   try {
-    const ach = readJSON(path.join(profileDir, 'achievements.json'));
-    const achData = ach && ach.data ? ach.data : ach;
-    const items = (achData && achData.items) ? achData.items : (Array.isArray(achData) ? achData : []);
-    allAchievements = items.map(item => ({
-      id: item.id,
-      name: item.title || item.name || 'Achievement',
-      description: item.description || item.summary || '',
-      impact_statement: null,
-    }));
+    const actFile = readJSON(path.join(profileDir, 'activities.json'));
+    if (actFile) {
+      // Merged schema: top-level activities[]
+      let items = Array.isArray(actFile.activities) ? actFile.activities
+        // Init schema: data.items[]
+        : (actFile.data && Array.isArray(actFile.data.items)) ? actFile.data.items
+        : [];
+      allActivities = items.map(item => ({
+        id: item.id,
+        name: item.activityName || item.title || item.name || 'Activity',
+        role: item.role || 'participant',
+        description: item.description || '',
+        hoursPerWeek: item.hoursPerWeek != null ? item.hoursPerWeek : null,
+        weeksPerYear: item.weeksPerYear != null ? item.weeksPerYear : null,
+      }));
+    }
   } catch (_) { /* skip */ }
 
-  try {
-    const act = readJSON(path.join(profileDir, 'activities.json'));
-    const actData = act && act.data ? act.data : act;
-    const items = (actData && actData.items) ? actData.items : (Array.isArray(actData) ? actData : []);
-    allActivities = items.map(item => ({
-      id: item.id,
-      name: item.activityName || item.name || 'Activity',
-      role: item.role || 'participant',
-      description: item.description || '',
-      hoursPerWeek: item.hoursPerWeek || null,
-      weeksPerYear: item.weeksPerYear || null,
-    }));
-  } catch (_) { /* skip */ }
-
-  // Filter achievements & activities by achievementIds if provided
+  // ── Filter achievements & activities by achievementIds if provided ───────────
+  // achievementIds covers both achievements and activities merged together
   let achievements = allAchievements;
   let activities = allActivities;
   if (sel && Array.isArray(sel.achievementIds)) {
-    // achievementIds covers both achievements and activities merged together
     achievements = allAchievements.filter(a => sel.achievementIds.includes(a.id));
     activities = allActivities.filter(a => sel.achievementIds.includes(a.id));
   }
 
-  // Impact statements — filtered by impactStatementIds if provided
+  // ── Impact statements (impact_statements.json) ──────────────────────────────
+  // Schema: { data: { statements: [{ id, statement, linkedAchievementName }] } }
+  //      or: { statements: [...] }  (flat)
   let impactStatements = [];
+
   try {
-    const is = readJSON(path.join(profileDir, 'impact_statements.json'));
-    const isData = is && is.data ? is.data : is;
-    const stmts = (isData && isData.statements) ? isData.statements : (Array.isArray(isData) ? isData : []);
+    const isFile = readJSON(path.join(profileDir, 'impact_statements.json'));
+    if (isFile) {
+      const isData = isFile.data || isFile;
+      const stmts = Array.isArray(isData.statements) ? isData.statements
+        : (Array.isArray(isData) ? isData : []);
 
-    let filteredStmts = stmts;
-    if (sel && Array.isArray(sel.impactStatementIds)) {
-      if (sel.impactStatementIds.length === 0) {
-        filteredStmts = [];
-      } else {
-        filteredStmts = stmts.filter(s => sel.impactStatementIds.includes(s.id));
+      let filteredStmts = stmts;
+      if (sel && Array.isArray(sel.impactStatementIds)) {
+        if (sel.impactStatementIds.length === 0) {
+          filteredStmts = [];
+        } else {
+          filteredStmts = stmts.filter(s => sel.impactStatementIds.includes(s.id));
+        }
       }
+
+      impactStatements = filteredStmts
+        .filter(stmt => stmt.statement)
+        .map(stmt => ({
+          statement: stmt.statement,
+          parentName: stmt.linkedAchievementName || stmt.achievementName || stmt.achievementId || 'Activity',
+        }));
+
+      // Link first impact statement to each achievement for the achievements block
+      achievements = achievements.map(a => {
+        const linked = impactStatements.find(s =>
+          s.parentName && (
+            s.parentName.toLowerCase().includes((a.name || '').toLowerCase().slice(0, 15)) ||
+            (a.name || '').toLowerCase().includes(s.parentName.toLowerCase().slice(0, 15))
+          )
+        );
+        return linked ? { ...a, impact_statement: linked.statement } : a;
+      });
     }
-
-    impactStatements = filteredStmts.map(stmt => ({
-      statement: stmt.statement,
-      parentName: stmt.linkedAchievementName || stmt.achievementName || stmt.achievementId || 'Activity',
-    }));
-
-    // Link impact statements to achievements
-    achievements = achievements.map(a => {
-      const linked = impactStatements.find(s =>
-        s.parentName && (
-          s.parentName.toLowerCase().includes((a.name || '').toLowerCase().slice(0, 15)) ||
-          (a.name || '').toLowerCase().includes(s.parentName.toLowerCase().slice(0, 15))
-        )
-      );
-      return linked ? { ...a, impact_statement: linked.statement } : a;
-    });
   } catch (_) { /* skip */ }
 
-  // Size limit: truncate if assembled text is too large
+  // ── Size limit: truncate if assembled text is too large ─────────────────────
   const profileData = { gpa, testScores, courses, achievements, activities, impactStatements };
   const textLen = JSON.stringify(profileData).length;
   if (textLen > MAX_PROFILE_TEXT) {

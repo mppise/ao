@@ -18,7 +18,10 @@ files_modified:
   - src/server/index.js
   - src/server/routes/config-limits.js
 commits: []
+gap_specs:
+  - gap.md
 warnings:
   - "limits.json lives in /src/config/ per spec. On fresh npx invocations this may not persist if the npx cache is cleared (known risk documented in story-spec.md). The file is written at runtime by POST /api/config/limits."
   - "escapeHtml is defined in app.js but used in limits-settings.js which loads first. This is safe because renderLimitsSettingsPanel and renderLimitsBanner are only invoked at runtime (after all scripts are loaded), not at parse/load time."
+  - "Enhancement (gap.md 2026-06-15): Common App and Coalition App preset inputs are now editable. Editing within a named preset tab auto-marks values as custom internally and sends preset:custom to the server. The server no longer enforces canonical values for named presets — all valid min/max pairs are accepted. The customization badge shows 'Customized (based on Common App)' while unsaved, clears after save."
 overall_status: pass

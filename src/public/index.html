@@ -18,10 +18,22 @@
       <a href="/" id="nav-home" class="navbar-brand fw-semibold text-white text-decoration-none" onclick="event.preventDefault(); appNavigate('/');">
         <i class="bi bi-mortarboard me-2"></i>Admissions Officer
       </a>
-      <a href="/settings" id="nav-settings" class="text-white text-decoration-none d-flex align-items-center gap-1 small" title="Settings" onclick="event.preventDefault(); appNavigate('/settings');">
-        <i class="bi bi-gear fs-5"></i>
-        <span class="d-none d-sm-inline">Settings</span>
-      </a>
+      <div class="d-flex align-items-center gap-3">
+        <button
+          type="button"
+          id="nav-btn-upload"
+          class="btn btn-sm btn-light ao-nav-upload-btn"
+          title="Upload a document"
+          aria-label="Upload a document"
+        >
+          <i class="bi bi-cloud-upload me-1"></i>
+          <span class="d-none d-sm-inline">Upload</span>
+        </button>
+        <a href="/settings" id="nav-settings" class="text-white text-decoration-none d-flex align-items-center gap-1 small" title="Settings" onclick="event.preventDefault(); appNavigate('/settings');">
+          <i class="bi bi-gear fs-5"></i>
+          <span class="d-none d-sm-inline">Settings</span>
+        </a>
+      </div>
     </div>
   </nav>
 

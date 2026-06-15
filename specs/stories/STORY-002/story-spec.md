@@ -8,7 +8,7 @@ spec_done: true
 
 ## What the user can do
 
-- User can click "Upload docs" on any of the four section tiles (Academic, Tests, Achievements, Activities) on the Profile Dashboard and be presented with a styled file picker that accepts PDF and image files only.
+- User can click the "Upload" button in the navbar on the Profile Dashboard and be presented with a styled file picker that accepts PDF and image files only. The upload modal opens with a section selector (4 pill buttons: Academic, Tests, Achievements, Activities) — the student must select a section before the upload can proceed.
 - User can select a PDF or image file (JPG, PNG, WEBP) from their file system and submit it — the UI immediately shows a processing spinner with the filename while the server uploads and classifies the document via Gemini Vision.
 - User can see the classification result on a dedicated preview screen: the detected document type (e.g., "SAT Score Report"), the category it belongs to (e.g., "Tests"), a confidence percentage, and a short text excerpt from the document so they can verify it is the right file.
 - User can click "Confirm" to save the classification result and move on (the file is persisted in `/DATA_DIR/uploads/` and metadata written to `documents.json`), or click "Try Another" to discard and upload a different file.
@@ -22,9 +22,9 @@ spec_done: true
 
 ```
 Profile Dashboard
-  → (click "Upload docs" on a tile)
-  → Screen 1: Upload Modal (file picker)
-  → (user selects file and clicks "Upload")
+  → (click "Upload" button in navbar)
+  → Screen 1: Upload Modal (file picker, section selector)
+  → (user selects file and clicks "Upload Document")
   → Screen 2: Processing State (spinner, in-modal)
   → Screen 3: Classification Result (in-modal)
   → (click "Confirm") → back to Profile Dashboard (tile updates)
@@ -39,7 +39,7 @@ The upload flow is entirely contained within a Bootstrap modal overlay on top of
 
 ### Screen 1 — Upload Modal (file picker)
 
-**Entry point:** Student clicks "Upload docs" button (`btn-outline-primary`) on any section tile on the Profile Dashboard.
+**Entry point:** Student clicks the "Upload" button (`nav-btn-upload`) in the navbar on the Profile Dashboard.
 
 **What it displays:**
 
@@ -48,30 +48,35 @@ The upload flow is entirely contained within a Bootstrap modal overlay on top of
 |  [X]                    Upload a Document                    |
 +--------------------------------------------------------------+
 |                                                              |
-|  Section: Academic                    (pre-selected, badge)  |
+|  Section:                                                    |
+|  [ Academic ] [ Tests ] [ Achievements ] [ Activities ]      |
+|  (pill buttons, btn-outline-secondary; selected pill becomes  |
+|   btn-primary; none selected by default on navbar entry)     |
 |                                                              |
-|  Drag and drop your file here, or click to browse            |
+|  Drag and drop your file here, or click the button below     |
 |                                                              |
 |  +--------------------------------------------------+        |
 |  |  [bi-cloud-upload]                               |        |
 |  |                                                  |        |
 |  |  Drop PDF or image here                          |        |
 |  |  PDF, JPG, PNG, WEBP — max 20 MB                 |        |
-|  |  [ Browse files ]   (btn-outline-secondary sm)   |        |
 |  +--------------------------------------------------+        |
 |  (hidden <input type="file"> accepts=".pdf,.jpg,.jpeg,       |
 |   .png,.webp")                                               |
 |                                                              |
 |  Selected file: (empty state — no file shown)               |
 |                                                              |
-|  [ Cancel ]  (btn-outline-secondary)   [ Upload ] (btn-primary, disabled until file selected)
+|  [ Cancel ]  (btn-outline-secondary)   [ Upload Document ] (btn-primary, always enabled)
 +--------------------------------------------------------------+
 ```
 
-**Section pre-selection:** The modal receives the source section as a data attribute from the clicked tile (`data-section="academic"`). The section name is displayed as a `badge bg-secondary` pill. The student cannot change the section in this modal — section reassignment is handled post-classification if the AI result differs (see Screen 3).
+**Section selector:** When opened via the navbar button, no section is pre-selected — all four pills are in `btn-outline-secondary` state. The student must click one pill to select a section before upload can proceed. If the student clicks "Upload Document" without selecting a section, an inline error appears: "Please select a section before uploading." The selected pill switches to `btn-primary`.
+
+When opened via the pending-doc review flow (`GET /api/documents/pending` → "Review" banner), the section is inferred from the document's `classification.category` and that pill is pre-selected.
 
 **File selection:**
-- Clicking "Browse files" or clicking anywhere inside the dashed drop zone triggers the hidden file input.
+- The drop zone contains no button. Clicking anywhere inside the dashed drop zone triggers the hidden file input.
+- The "Upload Document" button (`btn-primary`) is the sole upload action and is always enabled. When no file has been selected yet, clicking it opens the file picker. When a file is already selected, clicking it triggers the upload (`POST /api/documents/upload`). There is no disabled state for this button.
 - Drag-and-drop: dragging a file over the drop zone adds CSS class `drag-over` (border becomes `border-primary`, background `bg-light`). Dropping a valid file populates the selected file area. Dropping an invalid type shows an inline error (see error states below).
 - Once a file is selected, the drop zone is replaced by a selected-file display:
 
@@ -79,15 +84,14 @@ The upload flow is entirely contained within a Bootstrap modal overlay on top of
 |  [bi-file-earmark-pdf] transcript_2026.pdf    32 KB   [bi-x-circle remove]  |
 ```
 
-- The "Upload" button becomes `btn-primary` (enabled) once a valid file is selected.
-
 **Error states (inline, inside modal):**
+- No section selected and "Upload" clicked: inline error below the section pills — "Please select a section before uploading."
 - Unsupported file type (e.g., `.docx`, `.exe`): red `alert-danger` below the drop zone — "This file type is not supported. Please upload a PDF, JPG, PNG, or WEBP file."
 - File too large (> 20 MB): red `alert-danger` — "This file is too large (max 20 MB). Please compress or crop the document and try again."
 - No file selected and "Upload" clicked: inline error "Please select a file before uploading."
 
 **Actions:**
-- "Upload" (enabled): triggers `POST /api/documents/upload`, modal transitions to Screen 2.
+- "Upload Document" (always enabled): when no file is selected, opens the file picker; when a file is selected, triggers `POST /api/documents/upload` and modal transitions to Screen 2.
 - "Cancel": closes modal, no data written.
 - [X] (close): same as Cancel.
 
@@ -95,7 +99,7 @@ The upload flow is entirely contained within a Bootstrap modal overlay on top of
 
 ### Screen 2 — Processing State (spinner, in-modal)
 
-**Entry point:** Student clicks "Upload" with a valid file selected.
+**Entry point:** Student clicks "Upload Document" with a valid file already selected.
 
 **What it displays:**
 
@@ -221,10 +225,10 @@ After confirmation, the section tile that received the document updates:
 |  Academic                              |
 |  [bi-book]                             |
 |  1 document                            |
-|  [Upload docs]   (still available)     |
+|  [Add manually]  (btn-outline-secondary, still available)  |
 ```
 
-The tile count reflects the number of confirmed documents for that section. "Upload docs" remains available so students can add more documents.
+The tile count reflects the number of confirmed documents for that section. The per-tile "Upload docs" button has been removed — document upload is initiated exclusively from the navbar "Upload" button. Each section tile retains an "Add manually" button for direct manual data entry.
 
 ---
 
@@ -493,7 +497,7 @@ Discards a pending document (student clicks "Try Another" or closes modal withou
 
 ### Trigger
 
-Student clicks "Upload" with a valid file selected. The server calls Gemini after the file is saved to disk. The AI call is server-side only — the API key never reaches the browser.
+Student clicks "Upload Document" with a valid file already selected. The server calls Gemini after the file is saved to disk. The AI call is server-side only — the API key never reaches the browser.
 
 ### Input
 
@@ -602,7 +606,7 @@ If Gemini is unavailable (timeout > 45 seconds, API key error, network failure):
 **Auth:** No authentication. This is a single-user local desktop app. All endpoints are accessible at `http://localhost:3000` on the user's own machine. No session tokens, no login gates. The server binds to `127.0.0.1` only (not `0.0.0.0`) to prevent external network access.
 
 **Input validation:**
-- Client-side: file type checked via MIME sniffing on the `File` object in the browser (`file.type` must match allowed MIME types). File size checked against `file.size`. `sourceSection` is set programmatically from the tile's `data-section` attribute — not user-typed.
+- Client-side: file type checked via MIME sniffing on the `File` object in the browser (`file.type` must match allowed MIME types). File size checked against `file.size`. `sourceSection` is set from the selected section pill in the upload modal — enforced client-side before the upload fetch is initiated (section must be selected; if not, inline error is shown and upload is blocked).
 - Server-side (mandatory, authoritative):
   - `sourceSection`: must be `academic | tests | achievements | activities`. Enforced before any file processing.
   - File MIME type: validated by `multer` using `fileFilter` on `mimetype`. Allowed: `application/pdf`, `image/jpeg`, `image/png`, `image/webp`.
@@ -637,10 +641,10 @@ If the browser is closed during the Gemini API call (before the server responds)
 
 ## Acceptance criteria
 
-1. Clicking "Upload docs" on the Academic, Tests, Achievements, or Activities tile opens the upload modal with the correct section pre-selected as a badge and the section button highlighted.
+1. Clicking the "Upload" button in the navbar opens the upload modal with no section pre-selected (all four section pills in `btn-outline-secondary` state). Clicking a pill selects it (`btn-primary`). Attempting to upload without selecting a section shows an inline error "Please select a section before uploading" and does not initiate the upload request.
 2. Attempting to upload an unsupported file type (e.g., `.docx`, `.exe`) shows an inline `alert-danger` error inside the modal and does not initiate the upload request.
 3. Attempting to upload a file larger than 20 MB shows an inline size error and does not initiate the upload request.
-4. Selecting a valid PDF or image file and clicking "Upload" calls `POST /api/documents/upload`, transitions the modal to the processing spinner state, and disables the close button and Cancel during processing.
+4. The "Upload Document" button (`btn-primary`) is always visible and always enabled on Screen 1. When no file is selected, clicking it opens the file picker. When a valid file is selected, clicking it calls `POST /api/documents/upload`, transitions the modal to the processing spinner state, and disables the close button and Cancel during processing.
 5. A successful Gemini classification response displays the document type (e.g., "SAT Score Report"), category ("Tests"), confidence percentage, a text excerpt preview, and an AI recommendation banner (e.g., "This looks like an SAT Score Report. Recommended type: SAT Score Report (87% confident)") in the classification result screen.
 6. When Gemini returns confidence >= 50%, the student can click "Confirm" which calls `POST /api/documents/confirm` and closes the modal, and the corresponding section tile on the dashboard increments its document count.
 7. When Gemini returns confidence < 50% or returns "Unrecognized Document", the Confirm button is disabled until the student clicks one of the four manual section assignment buttons.
@@ -676,3 +680,5 @@ If the browser is closed during the Gemini API call (before the server responds)
 |---|---|---|---|
 | 1.0.0 | 2026-06-14 | Initial spec authored | feature |
 | 1.0.0 | 2026-06-14 | Bug-fix pass: added Gemini `recommendation` field to prompt, schema, document record, and all API response shapes; server-side fallback synthesis when Gemini omits recommendation; recommendation banner rendered on Screen 3; SPA routing integration note (no pushState on modal open/close; tile count updated in-place post-confirm); 5 new acceptance criteria (criteria 15–19) | fix |
+| 1.1.0 | 2026-06-15 | Gap merged: consolidated upload UI to single always-enabled "Upload Document" button — drop zone is now a pure drag-and-drop target with no embedded button; footer button opens file picker when no file is selected and triggers upload when file is ready; disabled state removed entirely; Screen 1 wireframe, Screen 2 entry point, AI trigger, and acceptance criterion 4 updated to reflect single-button flow | gap-merge |
+| 1.1.3 | 2026-06-15 | Gap merged: removed 4 per-section "Upload docs" buttons from section tiles; added single "Upload" button to navbar; Screen 1 now shows a section selector (4 pill buttons) instead of a static section badge; section must be selected before upload proceeds (inline error if skipped); pending-doc review flow still pre-selects section from classification category; tile post-confirm wireframe updated to show "Add manually" button; Section 1, Screen flow, Screen 1, Dashboard tile state, Input validation, and acceptance criterion 1 updated | gap-merge |
