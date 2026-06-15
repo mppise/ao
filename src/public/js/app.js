@@ -206,6 +206,17 @@ async function router(path) {
  * @param {string} path
  */
 function appNavigate(path) {
+  // STORY-007: If leaving /settings with unsaved limits changes, confirm first
+  if (
+    window.location.pathname === '/settings' &&
+    path !== '/settings' &&
+    typeof limitsHasUnsavedChanges === 'function' &&
+    limitsHasUnsavedChanges()
+  ) {
+    const confirmed = confirm('You have unsaved settings changes. Leave without saving?');
+    if (!confirmed) return;
+    if (typeof limitsResetDirtyState === 'function') limitsResetDirtyState();
+  }
   history.pushState({}, '', path);
   router(path);
 }
@@ -3153,6 +3164,9 @@ function openQuestionnaireModal(achievement) {
               <span class="badge bg-secondary ms-2 small">${escapeHtml(achievement.category)}</span>
               ${durationStr ? `<span class="text-muted small ms-2">${escapeHtml(durationStr)}</span>` : ''}
             </div>
+            <!-- STORY-007: Limits banner placeholder — filled asynchronously after modal shown -->
+            <div id="questionnaire-limits-banner-container"></div>
+
             <p class="text-muted small mb-3">These questions are optional. The more you share, the more personal your statement will be.</p>
 
             <div id="questionnaire-preview-alert"></div>
@@ -3185,6 +3199,11 @@ function openQuestionnaireModal(achievement) {
   const modalEl = document.getElementById('questionnaireModal');
   const bsModal = new bootstrap.Modal(modalEl);
   bsModal.show();
+
+  // STORY-007: Inject limits banner into modal (async, non-blocking)
+  if (typeof renderLimitsBanner === 'function') {
+    renderLimitsBanner('questionnaire-limits-banner-container', 'impact');
+  }
 
   // Restore any previously saved answers (e.g. returning from offcanvas)
   _restoreQuestionnaireFields();
@@ -5375,6 +5394,9 @@ async function showEssaysList() {
       ${genBtnHtml}
     </div>
 
+    <!-- STORY-007: Essay limits banner placeholder -->
+    <div id="essay-limits-banner-container"></div>
+
     <div id="essays-list-content">
       <div class="text-center py-4">
         <div class="spinner-border text-primary spinner-border-sm"></div>
@@ -5394,6 +5416,11 @@ async function showEssaysList() {
       // Opens provenance modal (Screen 2a) before generation — per STORY-006 spec
       openEssayProvenanceModal();
     });
+  }
+
+  // STORY-007: Inject essay limits banner (async, non-blocking)
+  if (typeof renderLimitsBanner === 'function') {
+    renderLimitsBanner('essay-limits-banner-container', 'essay');
   }
 
   // Init tooltips on disabled buttons
@@ -5649,9 +5676,19 @@ async function showSettings() {
   const s = result.data;
 
   renderTemplate(`
+    <div class="mb-3">
+      <a href="/" class="btn btn-sm btn-link text-muted ps-0" id="btn-settings-back">
+        <i class="bi bi-arrow-left me-1"></i>Back to Dashboard
+      </a>
+    </div>
+
     <h2 class="h4 fw-semibold mb-4">Settings</h2>
 
     <div id="settings-alert-zone" class="mb-3"></div>
+
+    <!-- STORY-007: Word Limits & College Guidelines -->
+    <h6 class="text-muted text-uppercase small mb-2">Word Limits &amp; College Guidelines</h6>
+    <div id="limits-settings-panel" class="mb-4"></div>
 
     <h6 class="text-muted text-uppercase small mb-2">Server</h6>
     <div class="card mb-4 shadow-sm">
@@ -5728,6 +5765,22 @@ async function showSettings() {
       </div>
     </div>
   `);
+
+  // ── STORY-007: Render limits panel ────────────────────────────────────────
+  if (typeof renderLimitsSettingsPanel === 'function') {
+    await renderLimitsSettingsPanel();
+  }
+
+  // ── STORY-007: Back to Dashboard with unsaved-changes guard ──────────────
+  document.getElementById('btn-settings-back').addEventListener('click', (e) => {
+    e.preventDefault();
+    if (typeof limitsHasUnsavedChanges === 'function' && limitsHasUnsavedChanges()) {
+      const confirmed = confirm('You have unsaved settings changes. Leave without saving?');
+      if (!confirmed) return;
+    }
+    if (typeof limitsResetDirtyState === 'function') limitsResetDirtyState();
+    appNavigate('/');
+  });
 
   // Init tooltips
   document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
@@ -5838,7 +5891,14 @@ async function showSettings() {
   // Go to Export Page
   const btnGoExport = document.getElementById('btn-go-to-export');
   if (btnGoExport) {
-    btnGoExport.addEventListener('click', () => appNavigate('/export'));
+    btnGoExport.addEventListener('click', () => {
+      if (typeof limitsHasUnsavedChanges === 'function' && limitsHasUnsavedChanges()) {
+        const confirmed = confirm('You have unsaved settings changes. Leave without saving?');
+        if (!confirmed) return;
+      }
+      if (typeof limitsResetDirtyState === 'function') limitsResetDirtyState();
+      appNavigate('/export');
+    });
   }
 }
 

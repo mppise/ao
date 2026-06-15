@@ -592,6 +592,28 @@ async function deleteEssay(id) {
   });
 }
 
+// ─── Config Limits API (STORY-007) ───────────────────────────────────────────
+
+/**
+ * GET /api/config/limits
+ * Returns current word/character limits configuration.
+ */
+async function getLimitsConfig() {
+  return apiFetch('/api/config/limits');
+}
+
+/**
+ * POST /api/config/limits
+ * Save new limits configuration.
+ * @param {{ preset: string, limits: object }} payload
+ */
+async function saveLimitsConfig(payload) {
+  return apiFetch('/api/config/limits', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
 // ─── Course CRUD API (STORY-003) ─────────────────────────────────────────────
 
 /**

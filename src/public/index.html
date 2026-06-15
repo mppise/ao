@@ -18,8 +18,9 @@
       <a href="/" id="nav-home" class="navbar-brand fw-semibold text-white text-decoration-none" onclick="event.preventDefault(); appNavigate('/');">
         <i class="bi bi-mortarboard me-2"></i>Admissions Officer
       </a>
-      <a href="/settings" id="nav-settings" class="text-white" title="Settings" onclick="event.preventDefault(); appNavigate('/settings');">
+      <a href="/settings" id="nav-settings" class="text-white text-decoration-none d-flex align-items-center gap-1 small" title="Settings" onclick="event.preventDefault(); appNavigate('/settings');">
         <i class="bi bi-gear fs-5"></i>
+        <span class="d-none d-sm-inline">Settings</span>
       </a>
     </div>
   </nav>
@@ -59,6 +60,8 @@
   <script src="/js/api-client.js"></script>
   <script src="/js/ui-utils.js"></script>
   <script src="/js/export.js"></script>
+  <!-- STORY-007: Limits settings panel and banner -->
+  <script src="/js/limits-settings.js"></script>
   <script src="/js/app.js"></script>
 </body>
 </html>

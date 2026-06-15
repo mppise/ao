@@ -1,0 +1,24 @@
+story_id: STORY-007
+runtime:
+  language: node
+  language_version: ">=18.0.0"
+  package_manager: npm
+  build_command: "node bin/cli.js"
+  build_output_dir: "src/public"
+  has_dockerfile: false
+  has_migrations: false
+  exposed_ports: [3000]
+files_modified:
+  - src/config/limits.json
+  - src/config/limitsDefaults.js
+  - src/public/index.html
+  - src/public/js/api-client.js
+  - src/public/js/app.js
+  - src/public/js/limits-settings.js
+  - src/server/index.js
+  - src/server/routes/config-limits.js
+commits: []
+warnings:
+  - "limits.json lives in /src/config/ per spec. On fresh npx invocations this may not persist if the npx cache is cleared (known risk documented in story-spec.md). The file is written at runtime by POST /api/config/limits."
+  - "escapeHtml is defined in app.js but used in limits-settings.js which loads first. This is safe because renderLimitsSettingsPanel and renderLimitsBanner are only invoked at runtime (after all scripts are loaded), not at parse/load time."
+overall_status: pass

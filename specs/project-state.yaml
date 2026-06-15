@@ -3,7 +3,7 @@ project:
   created: 2026-06-14
   release: "1.1.2"
   next_release_type: minor
-  active_story: STORY-006
+  active_story: STORY-007
 ideation_complete: true
 stories:
   STORY-001:
@@ -11,7 +11,7 @@ stories:
     depends_on: []
     spec_done: true
     built: true
-    deployed: false
+    deployed: true
   STORY-002:
     title: "Document upload and AI classification"
     depends_on:
@@ -25,21 +25,21 @@ stories:
       - STORY-002
     spec_done: true
     built: true
-    deployed: false
+    deployed: true
   STORY-003a:
     title: "AI transparency and data provenance display"
     depends_on:
       - STORY-003
     spec_done: true
     built: true
-    deployed: false
+    deployed: true
   STORY-004:
     title: "Impact statement generation and refinement"
     depends_on:
       - STORY-003a
     spec_done: true
     built: true
-    deployed: false
+    deployed: true
   STORY-005:
     title: "Profile export (JSON, PDF) and shareable links"
     depends_on:
@@ -53,6 +53,12 @@ stories:
       - STORY-004
       - STORY-003a
     spec_done: true
-    built: false
+    built: true
+    deployed: true
+  STORY-007:
+    title: "Configurable word limits & college guideline presets"
+    depends_on: []
+    spec_done: true
+    built: true
     deployed: false
 

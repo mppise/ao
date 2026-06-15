@@ -54,6 +54,10 @@ app.get('/share/:token', ...shareRouter.publicShareHandler);
 const essaysRouter = require('./routes/essays');
 app.use('/api/essays', essaysRouter);
 
+// /api/config/limits — GET returns current limits; POST saves new limits
+const configLimitsRouter = require('./routes/config-limits');
+app.use('/api/config/limits', configLimitsRouter);
+
 // SPA fallback: serve index.html for all non-API GET routes
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api/')) {
