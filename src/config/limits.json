@@ -3,19 +3,19 @@
   "lastUpdated": "2026-06-15T14:36:15.525Z",
   "limits": {
     "impactStatements": {
-      "unit": "characters",
-      "min": 500,
-      "max": 750
+      "unit": "words",
+      "min": 100,
+      "max": 200
     },
     "essays": {
       "unit": "words",
-      "min": 200,
-      "max": 250
+      "min": 500,
+      "max": 650
     },
     "questionnaireFields": {
-      "unit": "characters",
-      "min": 500,
-      "max": 750
+      "unit": "words",
+      "min": 50,
+      "max": 100
     }
   }
 }

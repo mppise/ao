@@ -108,7 +108,7 @@ router.post('/', (req, res) => {
   }
   const resolvedLimits = {
     impactStatements: {
-      unit: 'characters',
+      unit: 'words',
       min: Math.trunc(limits.impactStatements.min),
       max: Math.trunc(limits.impactStatements.max),
     },
@@ -118,7 +118,7 @@ router.post('/', (req, res) => {
       max: Math.trunc(limits.essays.max),
     },
     questionnaireFields: {
-      unit: 'characters',
+      unit: 'words',
       min: Math.trunc(limits.questionnaireFields.min),
       max: Math.trunc(limits.questionnaireFields.max),
     },

@@ -207,7 +207,7 @@ async function renderLimitsBanner(containerId, type) {
   if (type === 'impact') {
     const min = limits.impactStatements.min;
     const max = limits.impactStatements.max;
-    limitsLine = `Impact statement: ${min} – ${max} characters`;
+    limitsLine = `Impact statement: ${min} – ${max} words`;
   } else {
     const min = limits.essays.min;
     const max = limits.essays.max;
@@ -302,7 +302,7 @@ async function renderLimitsSettingsPanel() {
           <label class="form-label small fw-semibold">Impact Statements</label>
           <div class="row g-2">
             <div class="col-auto">
-              <label for="limits-is-min" class="col-form-label col-form-label-sm">Min chars:</label>
+              <label for="limits-is-min" class="col-form-label col-form-label-sm">Min words:</label>
             </div>
             <div class="col-auto">
               <input type="number" id="limits-is-min"
@@ -311,7 +311,7 @@ async function renderLimitsSettingsPanel() {
                 min="0" max="9999" step="1" style="width:90px;">
             </div>
             <div class="col-auto">
-              <label for="limits-is-max" class="col-form-label col-form-label-sm">Max chars:</label>
+              <label for="limits-is-max" class="col-form-label col-form-label-sm">Max words:</label>
             </div>
             <div class="col-auto">
               <input type="number" id="limits-is-max"
@@ -354,7 +354,7 @@ async function renderLimitsSettingsPanel() {
           <label class="form-label small fw-semibold">Questionnaire Fields</label>
           <div class="row g-2">
             <div class="col-auto">
-              <label for="limits-qf-min" class="col-form-label col-form-label-sm">Min chars:</label>
+              <label for="limits-qf-min" class="col-form-label col-form-label-sm">Min words:</label>
             </div>
             <div class="col-auto">
               <input type="number" id="limits-qf-min"
@@ -363,7 +363,7 @@ async function renderLimitsSettingsPanel() {
                 min="0" max="9999" step="1" style="width:90px;">
             </div>
             <div class="col-auto">
-              <label for="limits-qf-max" class="col-form-label col-form-label-sm">Max chars:</label>
+              <label for="limits-qf-max" class="col-form-label col-form-label-sm">Max words:</label>
             </div>
             <div class="col-auto">
               <input type="number" id="limits-qf-max"
