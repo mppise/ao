@@ -6,6 +6,7 @@ const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const { readJSON, writeJSON, appendAuditLog } = require('../../utils/file-io');
 const { generateImpactStatement, computePreviewReasoning } = require('../../ai/impact');
+const { getLimits } = require('./config-limits');
 
 const router = express.Router();
 
@@ -236,6 +237,15 @@ router.post('/generate', async (req, res) => {
 
   try {
     const result = await generateImpactStatement(norm, answers);
+
+    // Enforce character count limits
+    const limits = getLimits();
+    const impactLimits = limits.limits.impactStatements;
+    const charCount = result.draft.length;
+    if (charCount < impactLimits.min || charCount > impactLimits.max) {
+      console.warn(`[impact-statements/generate] AI draft is ${charCount} characters, limit is ${impactLimits.min}–${impactLimits.max}`);
+    }
+
     return res.json(envelope(true, {
       achievementId,
       achievementName: norm.name,

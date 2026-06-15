@@ -6,6 +6,8 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const { readJSON, writeJSON, appendAuditLog } = require('../../utils/file-io');
 const { generateEssayDraft } = require('../../ai/essay');
+const configLimitsRouter = require('./config-limits');
+const { getLimits } = require('./config-limits');
 
 const router = express.Router();
 
@@ -323,6 +325,14 @@ router.post('/generate', async (req, res) => {
 
   // Record successful generation for rate limiting
   recordGeneration();
+
+  // Enforce word count limits
+  const limits = getLimits();
+  const essayLimits = limits.limits.essays;
+  const wordCount = aiText.split(/\s+/).filter(Boolean).length;
+  if (wordCount < essayLimits.min || wordCount > essayLimits.max) {
+    console.warn(`[essays/generate] AI draft is ${wordCount} words, limit is ${essayLimits.min}–${essayLimits.max}`);
+  }
 
   const now = new Date().toISOString();
   const draft = {
