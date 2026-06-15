@@ -4183,13 +4183,12 @@ async function showImpactGenerator(achievement, answersArg) {
         id="impact-statement-textarea"
         class="form-control"
         rows="6"
-        maxlength="1000"
         placeholder="Your statement will appear here once the draft is ready. Edit it freely."
         disabled
       ></textarea>
       <div class="d-flex justify-content-between mt-1">
         <div id="impact-textarea-error" class="text-danger small"></div>
-        <span class="text-muted small">Character count: <span id="impact-char-count">0</span> / 1000</span>
+        <span class="text-muted small">Words: <span id="impact-word-count">0</span> / 200</span>
       </div>
     </div>
 
@@ -4234,11 +4233,11 @@ async function showImpactGenerator(achievement, answersArg) {
     appNavigate('/');
   });
 
-  // Character counter
+  // Word counter
   const textarea = document.getElementById('impact-statement-textarea');
   textarea.addEventListener('input', () => {
-    const len = textarea.value.length;
-    document.getElementById('impact-char-count').textContent = len;
+    const wordCount = textarea.value.trim().split(/\s+/).filter(Boolean).length;
+    document.getElementById('impact-word-count').textContent = wordCount;
     validateImpactTextarea();
   });
 
@@ -4250,14 +4249,15 @@ async function showImpactGenerator(achievement, answersArg) {
     const val = textarea.value.trim();
     const errorEl = document.getElementById('impact-textarea-error');
     const saveBtn = document.getElementById('btn-save-as-is');
+    const wordCount = val.split(/\s+/).filter(Boolean).length;
 
     if (val.length === 0) {
       if (errorEl) errorEl.textContent = 'Statement cannot be empty.';
       if (saveBtn) saveBtn.disabled = true;
       return false;
     }
-    if (val.length > 1000) {
-      if (errorEl) errorEl.textContent = 'Statement is too long (max 1000 characters).';
+    if (wordCount > 200) {
+      if (errorEl) errorEl.textContent = 'Statement is too long (max 200 words).';
       if (saveBtn) saveBtn.disabled = true;
       return false;
     }
@@ -5215,12 +5215,10 @@ function showEssayEditScreen(draft, isNew) {
         <!-- Inline error -->
         <div id="essay-save-error" class="text-danger small mb-2 d-none"></div>
 
-        <!-- Word / char count -->
-        <div class="d-flex align-items-center gap-4 mb-3">
-          <span>Words: <strong id="essay-word-count">0</strong> / <span id="essay-word-target" class="fw-medium">Target: 500–650</span></span>
-          <span class="text-muted small">Characters: <span id="essay-char-count">0</span></span>
+        <!-- Word count -->
+        <div class="text-muted small mb-3">
+          Words: <strong id="essay-word-count">0</strong> / Target: 500–650
         </div>
-        <div id="essay-word-status" class="small mb-3"></div>
 
         <div class="d-flex gap-2 flex-wrap">
           <button class="btn btn-primary" id="btn-save-essay" disabled>
@@ -5240,8 +5238,6 @@ function showEssayEditScreen(draft, isNew) {
 
   const textarea = document.getElementById('essay-textarea');
   const wordCountEl = document.getElementById('essay-word-count');
-  const charCountEl = document.getElementById('essay-char-count');
-  const wordStatusEl = document.getElementById('essay-word-status');
   const saveBtn = document.getElementById('btn-save-essay');
 
   // Last saved version for discard
@@ -5251,37 +5247,8 @@ function showEssayEditScreen(draft, isNew) {
   function updateWordCount() {
     const text = textarea.value;
     const words = text.trim() === '' ? 0 : text.trim().split(/\s+/).filter(Boolean).length;
-    const chars = text.length;
 
     wordCountEl.textContent = words;
-    charCountEl.textContent = chars.toLocaleString();
-
-    // Color and status
-    wordCountEl.className = '';
-    if (words === 0) {
-      wordStatusEl.textContent = '';
-      wordStatusEl.className = 'small mb-3';
-    } else if (words < 200) {
-      wordCountEl.className = 'text-danger';
-      wordStatusEl.textContent = 'Too short';
-      wordStatusEl.className = 'small mb-3 text-danger';
-    } else if (words < 500) {
-      wordCountEl.className = 'text-warning';
-      wordStatusEl.textContent = 'Below target';
-      wordStatusEl.className = 'small mb-3 text-warning';
-    } else if (words <= 650) {
-      wordCountEl.className = 'text-success';
-      wordStatusEl.textContent = 'On target';
-      wordStatusEl.className = 'small mb-3 text-success';
-    } else if (words <= 1000) {
-      wordCountEl.className = 'text-warning';
-      wordStatusEl.textContent = 'Above target';
-      wordStatusEl.className = 'small mb-3 text-warning';
-    } else {
-      wordCountEl.className = 'text-danger';
-      wordStatusEl.textContent = 'Too long';
-      wordStatusEl.className = 'small mb-3 text-danger';
-    }
 
     // Save button enabled only if non-empty and text has changed from last saved
     saveBtn.disabled = words === 0 || textarea.value === lastSavedText;
