@@ -87,6 +87,7 @@ router.get('/provenance', (req, res) => {
   const warnings = [];
   let gpa = null;
   let courses = null;
+  let apIbScores = null;
   let testScores = null;
   let achievements = null;
   let impactStatements = null;
@@ -139,6 +140,23 @@ router.get('/provenance', (req, res) => {
         if (c.grade != null) label += ` — ${c.grade}`;
         return label;
       }).filter(Boolean);
+    }
+
+    // Read AP/IB exam scores (top-level apIbScores[])
+    let apIbList = [];
+    if (academicData && Array.isArray(academicData.apIbScores) && academicData.apIbScores.length > 0) {
+      apIbList = academicData.apIbScores;
+    } else if (academicData && academicData.data && Array.isArray(academicData.data.apIbScores)) {
+      apIbList = academicData.data.apIbScores;
+    }
+    if (apIbList.length > 0) {
+      apIbScores = apIbList.map(item => ({
+        id: item.id,
+        name: `${item.examType || 'AP'} ${item.courseName || item.examName || ''}`,
+        score: String(item.score),
+        confidence: item.confidence != null ? item.confidence : null,
+        source: item.source || 'Extracted',
+      }));
     }
   } catch (err) {
     if (err.code !== 'ENOENT') {
@@ -288,7 +306,7 @@ router.get('/provenance', (req, res) => {
     }
   }
 
-  const responseData = { gpa, courses, testScores, achievements, impactStatements };
+  const responseData = { gpa, courses, apIbScores, testScores, achievements, impactStatements };
   const response = envelope(true, responseData);
   if (warnings.length > 0) response.warnings = warnings;
   return res.json(response);

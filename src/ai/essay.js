@@ -7,14 +7,15 @@ const config = require('../config');
 
 /**
  * Build the Gemini prompt from assembled profile data.
- * @param {object} profileData - { gpa, testScores, courses, achievements, activities, impactStatements }
+ * @param {object} profileData - { gpa, testScores, apIbScores, courses, achievements, activities, impactStatements }
  * @returns {string}
  */
 function buildEssayPrompt(profileData) {
-  const { gpa, testScores, courses, achievements, activities, impactStatements } = profileData;
+  const { gpa, testScores, apIbScores, courses, achievements, activities, impactStatements } = profileData;
 
   const gpaStr = gpa || 'Not provided';
   const testScoresStr = testScores || 'Not provided';
+  const apIbStr = apIbScores || 'Not provided';
   const coursesStr = courses && courses.length > 0
     ? courses.slice(0, 10).map(c => {
         if (typeof c === 'string') return c;
@@ -69,6 +70,7 @@ STUDENT PROFILE DATA:
 Academic:
 GPA: ${gpaStr}
 Test scores: ${testScoresStr}
+AP/IB Exam Scores: ${apIbStr}
 Notable courses: ${coursesStr}
 
 Achievements:
@@ -94,7 +96,7 @@ const MAX_PROFILE_TEXT = 8000;
 
 /**
  * Read and assemble profile data from disk for essay generation.
- * Returns { gpa, testScores, courses, achievements, activities, impactStatements }
+ * Returns { gpa, testScores, apIbScores, courses, achievements, activities, impactStatements }
  * Missing files are silently omitted.
  * @param {string} dataDir
  * @param {object|null} [provenanceSelection] - optional filter: { includeGpa, testScoreIds, achievementIds, impactStatementIds }
@@ -106,11 +108,12 @@ function assembleProfileData(dataDir, provenanceSelection) {
 
   // ── Academic (academic.json) ────────────────────────────────────────────────
   // The file is written in two schemas:
-  //   Init schema:  { data: { gpa, courses: [] }, sources: [] }
+  //   Init schema:  { data: { gpa, courses: [], apIbScores: [] }, sources: [] }
   //   Merged schema: { gpa: { overall: { value, confidence } }, courses: [{ name, grade, level }],
   //                    apIbScores: [...] }  (top-level, no data wrapper)
   let gpa = null;
   let courses = [];
+  let apIbScores = null;
 
   const includeGpa = !sel || sel.includeGpa !== false;
 
@@ -138,6 +141,21 @@ function assembleProfileData(dataDir, provenanceSelection) {
       // Init schema: data.courses[]
       } else if (academic.data && Array.isArray(academic.data.courses)) {
         courses = academic.data.courses;
+      }
+
+      // ── AP/IB Exam Scores (always included per spec) ──
+      // Merged schema: top-level apIbScores[]
+      let apIbList = [];
+      if (Array.isArray(academic.apIbScores) && academic.apIbScores.length > 0) {
+        apIbList = academic.apIbScores;
+      // Init schema: data.apIbScores[]
+      } else if (academic.data && Array.isArray(academic.data.apIbScores)) {
+        apIbList = academic.data.apIbScores;
+      }
+      if (apIbList.length > 0) {
+        apIbScores = apIbList.map(item =>
+          `${item.examType || 'AP'} ${item.courseName || item.examName || ''}: ${item.score}`
+        ).join(', ');
       }
     }
   } catch (_) { /* file absent — skip */ }
@@ -318,7 +336,7 @@ function assembleProfileData(dataDir, provenanceSelection) {
   } catch (_) { /* skip */ }
 
   // ── Size limit: truncate if assembled text is too large ─────────────────────
-  const profileData = { gpa, testScores, courses, achievements, activities, impactStatements };
+  const profileData = { gpa, testScores, apIbScores, courses, achievements, activities, impactStatements };
   const textLen = JSON.stringify(profileData).length;
   if (textLen > MAX_PROFILE_TEXT) {
     console.warn(`[essay] Profile data exceeds ${MAX_PROFILE_TEXT} chars (${textLen}). Truncating.`);

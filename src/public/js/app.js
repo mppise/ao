@@ -3763,6 +3763,23 @@ async function _fetchAndRenderProvenance(bsModal, modalEl) {
         </div>`;
     }
 
+    // AP/IB Exam Scores (display-only, always included)
+    if (data.apIbScores && data.apIbScores.length > 0) {
+      const rows = data.apIbScores.map(a => {
+        const srcBadge = `<span class="badge bg-light text-dark border">${escapeHtml(a.source || 'unknown')}</span>`;
+        return `
+          <div class="ao-provenance-row">
+            <div class="ao-prov-label">${escapeHtml(a.name)}: <strong>${escapeHtml(a.score)}</strong></div>
+            <div class="ao-prov-badges">${srcBadge}</div>
+          </div>`;
+      }).join('');
+      sectionsHtml += `
+        <div class="card mb-3">
+          <div class="card-header fw-semibold"><i class="bi bi-star me-1"></i>AP/IB Exam Scores (included)</div>
+          <div class="card-body py-2">${rows}</div>
+        </div>`;
+    }
+
     // Achievements & activities
     if (data.achievements && data.achievements.length > 0) {
       const rows = data.achievements.map(a => {
